@@ -58,7 +58,7 @@
     justify-content:center;
     flex-wrap:wrap;
     gap: 14px;
-    margin: 6px 16px 0;
+    margin: 22px 16px 0;
     font-family:'DM Mono', monospace;
     font-size: 9.5px;
     color: var(--muted);
@@ -87,7 +87,7 @@
 </header>
 
 <div class="wheel-wrap">
-  <svg id="wheel" viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg"></svg>
+  <svg id="wheel" viewBox="-30 -30 860 860" xmlns="http://www.w3.org/2000/svg"></svg>
 </div>
 
 <div class="legend">
@@ -433,19 +433,28 @@ async function toggleNotifications(){
     return;
   }
 
+  let sub;
   try{
-    const sub = await reg.pushManager.subscribe({
+    sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
     });
-    await fetch('/.netlify/functions/subscribe', {
+    const res = await fetch('/.netlify/functions/subscribe', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ subscription: sub.toJSON() }),
     });
+    if(!res.ok){
+      let detail = '';
+      try{ const j = await res.json(); detail = j.error ? ` (${j.error})` : ''; }catch(e){}
+      throw new Error(`Server rejected the subscription — status ${res.status}${detail}`);
+    }
     setNotifyStatus('You\'ll get a notification whenever a match finishes.');
   }catch(e){
-    setNotifyStatus('Could not enable notifications on this device.');
+    setNotifyStatus('Subscribe failed: ' + e.message);
+    // Roll back the client-side subscription since the server never saved it —
+    // otherwise the button would claim "enabled" while nothing is actually stored.
+    try{ await sub?.unsubscribe(); }catch(e2){}
   }
   await updateNotifyButton();
 }
@@ -462,8 +471,12 @@ document.getElementById('testNotifyBtn').addEventListener('click', async () => {
   try{
     const res = await fetch('/.netlify/functions/test-notify', { method: 'POST' });
     const json = await res.json();
-    if(json.sent > 0){
+    if(!res.ok){
+      setNotifyStatus('Test-notify error: ' + (json.error || res.status));
+    } else if(json.sent > 0){
       setNotifyStatus(`Test sent to ${json.sent} device(s) — check your notifications.`);
+    } else if(json.errors && json.errors.length){
+      setNotifyStatus('Send failed: ' + json.errors[0]);
     } else {
       setNotifyStatus(json.message || 'No subscribed devices to send to yet — tap Enable notifications first.');
     }

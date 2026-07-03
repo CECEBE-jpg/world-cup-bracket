@@ -2,50 +2,56 @@ const { getStore } = require('@netlify/blobs');
 const crypto = require('crypto');
 
 function keyFor(subscription) {
-  // Stable, unique-per-device key derived from the subscription's endpoint URL.
   return crypto.createHash('sha256').update(subscription.endpoint).digest('hex');
 }
 
+const headers = {
+  'Content-Type': 'application/json',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
 exports.handler = async function (event) {
-  const headers = {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-  };
+  try {
+    if (event.httpMethod === 'OPTIONS') {
+      return { statusCode: 204, headers };
+    }
 
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 204, headers };
-  }
+    if (event.httpMethod !== 'POST' && event.httpMethod !== 'DELETE') {
+      return { statusCode: 405, headers, body: JSON.stringify({ error: 'method not allowed' }) };
+    }
 
-  const store = getStore('push-subscriptions');
-
-  if (event.httpMethod === 'POST') {
+    let body;
     try {
-      const body = JSON.parse(event.body);
-      const subscription = body.subscription;
-      if (!subscription || !subscription.endpoint) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: 'missing subscription' }) };
-      }
+      body = JSON.parse(event.body || '{}');
+    } catch (e) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'invalid JSON body' }) };
+    }
+
+    const subscription = body.subscription;
+    if (!subscription || !subscription.endpoint) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'missing subscription.endpoint' }) };
+    }
+
+    const store = getStore('push-subscriptions');
+
+    if (event.httpMethod === 'POST') {
       await store.setJSON(keyFor(subscription), subscription);
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
-    } catch (e) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'bad request' }) };
     }
-  }
 
-  if (event.httpMethod === 'DELETE') {
-    try {
-      const body = JSON.parse(event.body);
-      const subscription = body.subscription;
-      if (subscription && subscription.endpoint) {
-        await store.delete(keyFor(subscription));
-      }
-      return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
-    } catch (e) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'bad request' }) };
-    }
-  }
+    // DELETE
+    await store.delete(keyFor(subscription));
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
 
-  return { statusCode: 405, headers, body: JSON.stringify({ error: 'method not allowed' }) };
+  } catch (e) {
+    // Logged so it shows up in the Netlify Functions log for this invocation.
+    console.error('subscribe function error:', e);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'internal error', detail: String(e && e.message || e) }),
+    };
+  }
 };
