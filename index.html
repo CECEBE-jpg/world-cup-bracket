@@ -446,7 +446,10 @@ async function toggleNotifications(){
     });
     if(!res.ok){
       let detail = '';
-      try{ const j = await res.json(); detail = j.error ? ` (${j.error})` : ''; }catch(e){}
+      try{
+        const j = await res.json();
+        detail = j.detail ? ` — ${j.detail}` : (j.error ? ` (${j.error})` : '');
+      }catch(e){}
       throw new Error(`Server rejected the subscription — status ${res.status}${detail}`);
     }
     setNotifyStatus('You\'ll get a notification whenever a match finishes.');
