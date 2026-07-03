@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World Cup 2026 — Winners Tracker</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#05100B">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+  :root{
+    --bg: #05100B;
+    --ink: #F2EFE6;
+    --gold: #D4A537;
+    --muted: #4E6459;
+    --line: #3A5548;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{
+    background: radial-gradient(circle at 50% 42%, #0E241A 0%, #05100B 60%, #030A07 100%);
+    color: var(--ink);
+    font-family:'Oswald', sans-serif;
+    padding: 18px 0 40px;
+  }
+  header{
+    padding: 0 16px 14px;
+    text-align:center;
+  }
+  .eyebrow{
+    font-family:'DM Mono', monospace;
+    font-size:10.5px;
+    letter-spacing:0.2em;
+    text-transform:uppercase;
+    color: var(--gold);
+    margin-bottom:4px;
+  }
+  h1{ font-size:22px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; }
+  .sub{ font-family:'DM Mono', monospace; font-size:10.5px; color:var(--muted); margin-top:6px; }
+
+  .wheel-wrap{
+    width:100%;
+    max-width: 760px;
+    margin: 10px auto 0;
+    padding: 0 6px;
+  }
+  svg{ width:100%; height:auto; display:block; }
+  .qualified circle{ animation: pulse 2.4s ease-in-out infinite; }
+  @keyframes pulse{
+    0%,100%{ filter: drop-shadow(0 0 0 rgba(212,165,55,0)); }
+    50%{ filter: drop-shadow(0 0 4px rgba(212,165,55,0.65)); }
+  }
+
+  .legend{
+    display:flex;
+    justify-content:center;
+    flex-wrap:wrap;
+    gap: 14px;
+    margin: 6px 16px 0;
+    font-family:'DM Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+  }
+  .legend span{ display:inline-flex; align-items:center; gap:5px; }
+  .legend i{ width:12px; height:2px; display:inline-block; }
+
+  footer{
+    margin: 22px 20px 0;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+    font-family:'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height:1.6;
+    text-align:center;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">FIFA World Cup 2026 · Knockout Wheel</div>
+  <h1>Winners Tracker</h1>
+  <div class="sub" id="syncStatus">Loading…</div>
+</header>
+
+<div class="wheel-wrap">
+  <svg id="wheel" viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg"></svg>
+</div>
+
+<div class="legend">
+  <span><i style="background:#D4A537"></i> Qualified — flag moved up</span>
+  <span><i style="background:#3A5548;border-top:1px dashed #4E6459"></i> Not yet decided</span>
+</div>
+
+<div style="text-align:center; margin-top:10px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+  <button id="syncBtn" style="font-family:'DM Mono',monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:#D4A537; background:transparent; border:1px solid #3A5548; border-radius:20px; padding:7px 16px; cursor:pointer;">↻ Sync now</button>
+  <button id="notifyBtn" style="font-family:'DM Mono',monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:#D4A537; background:transparent; border:1px solid #3A5548; border-radius:20px; padding:7px 16px; cursor:pointer;">🔔 Enable notifications</button>
+  <button id="testNotifyBtn" style="font-family:'DM Mono',monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:#D4A537; background:transparent; border:1px solid #3A5548; border-radius:20px; padding:7px 16px; cursor:pointer;">📨 Send test</button>
+</div>
+<div id="notifyStatus" style="text-align:center; margin-top:8px; font-family:'DM Mono',monospace; font-size:9.5px; color:#4E6459;"></div>
+
+<footer id="footerNote">
+  This syncs live scores automatically every few minutes via its own scores function, so it should stay current on its own. If a sync ever fails, it keeps showing the last results it saw — tap "Sync now" any time to retry, or ask Claude to rebuild the file.
+</footer>
+
+<script>
+// Base snapshot — used instantly on load, then overwritten by live results if the sync succeeds.
+const baseR32 = [
+  {id:'M1', home:{n:'South Africa', c:'RSA', f:'🇿🇦'}, away:{n:'Canada', c:'CAN', f:'🇨🇦'}, score:[0,1], status:'final'},
+  {id:'M2', home:{n:'Netherlands', c:'NED', f:'🇳🇱'}, away:{n:'Morocco', c:'MAR', f:'🇲🇦'}, score:[1,1], status:'final', pk:true, winnerSide:'away'},
+  {id:'M3', home:{n:'Germany', c:'GER', f:'🇩🇪'}, away:{n:'Paraguay', c:'PAR', f:'🇵🇾'}, score:[1,1], status:'final', pk:true, winnerSide:'away'},
+  {id:'M4', home:{n:'France', c:'FRA', f:'🇫🇷'}, away:{n:'Sweden', c:'SWE', f:'🇸🇪'}, score:[3,0], status:'final'},
+  {id:'M5', home:{n:'Brazil', c:'BRA', f:'🇧🇷'}, away:{n:'Japan', c:'JPN', f:'🇯🇵'}, score:[2,1], status:'final'},
+  {id:'M6', home:{n:'Ivory Coast', c:'CIV', f:'🇨🇮'}, away:{n:'Norway', c:'NOR', f:'🇳🇴'}, score:[1,2], status:'final'},
+  {id:'M7', home:{n:'Mexico', c:'MEX', f:'🇲🇽'}, away:{n:'Ecuador', c:'ECU', f:'🇪🇨'}, score:[2,0], status:'final'},
+  {id:'M8', home:{n:'England', c:'ENG', f:'🏴󠁧󠁢󠁥󠁮󠁧󠁿'}, away:{n:'Congo DR', c:'COD', f:'🇨🇩'}, score:[2,1], status:'final'},
+  {id:'M9', home:{n:'Spain', c:'ESP', f:'🇪🇸'}, away:{n:'Austria', c:'AUT', f:'🇦🇹'}, score:[3,0], status:'final'},
+  {id:'M10', home:{n:'Portugal', c:'POR', f:'🇵🇹'}, away:{n:'Croatia', c:'CRO', f:'🇭🇷'}, score:[2,1], status:'final'},
+  {id:'M11', home:{n:'Belgium', c:'BEL', f:'🇧🇪'}, away:{n:'Senegal', c:'SEN', f:'🇸🇳'}, score:[3,2], status:'final'},
+  {id:'M12', home:{n:'USA', c:'USA', f:'🇺🇸'}, away:{n:'Bosnia & Herz.', c:'BIH', f:'🇧🇦'}, score:[2,0], status:'final'},
+  {id:'M13', home:{n:'Australia', c:'AUS', f:'🇦🇺'}, away:{n:'Egypt', c:'EGY', f:'🇪🇬'}, status:'scheduled'},
+  {id:'M14', home:{n:'Argentina', c:'ARG', f:'🇦🇷'}, away:{n:'Cape Verde', c:'CPV', f:'🇨🇻'}, status:'scheduled'},
+  {id:'M15', home:{n:'Switzerland', c:'SUI', f:'🇨🇭'}, away:{n:'Algeria', c:'DZA', f:'🇩🇿'}, score:[2,0], status:'final'},
+  {id:'M16', home:{n:'Colombia', c:'COL', f:'🇨🇴'}, away:{n:'Ghana', c:'GHA', f:'🇬🇭'}, status:'scheduled'},
+];
+
+const CACHE_KEY = 'wc2026-bracket-cache-v1';
+
+function winnerOf(m){
+  if(m.status !== 'final') return null;
+  if(m.winnerSide) return m.winnerSide === 'home' ? m.home : m.away;
+  if(m.score[0] === m.score[1]) return null; // equal score, no winner flag known yet
+  return m.score[0] > m.score[1] ? m.home : m.away;
+}
+
+// ---------- Rendering (pure function of an r32 array) ----------
+function renderWheel(r32){
+  const CX = 400, CY = 400;
+  const R_LEAF = 340, R_L1 = 296, R_L2 = 248, R_L3 = 196, R_L4 = 138, R_L5 = 70;
+  const START_ANGLE = -90;
+  const STEP = 360/32;
+  const palette = ['#D4A537','#C8453C','#4A8F6B','#4C7FBF','#B8875C','#8B6FB0'];
+
+  function polar(r, angleDeg){
+    const rad = angleDeg * Math.PI/180;
+    return { x: CX + r*Math.cos(rad), y: CY + r*Math.sin(rad) };
+  }
+
+  const leafAngles = [];
+  r32.forEach((m,i) => {
+    leafAngles.push(START_ANGLE + (i*2)*STEP);
+    leafAngles.push(START_ANGLE + (i*2+1)*STEP);
+  });
+  const l1Angles = []; for(let j=0;j<16;j++) l1Angles.push((leafAngles[j*2]+leafAngles[j*2+1])/2);
+  const l2Angles = []; for(let k=0;k<8;k++) l2Angles.push((l1Angles[k*2]+l1Angles[k*2+1])/2);
+  const l3Angles = []; for(let m=0;m<4;m++) l3Angles.push((l2Angles[m*2]+l2Angles[m*2+1])/2);
+  const l4Angles = []; for(let n=0;n<2;n++) l4Angles.push((l3Angles[n*2]+l3Angles[n*2+1])/2);
+
+  let svgParts = [];
+
+  function radialLink(rChild, aChild, rParent, aParent, color, dashed){
+    const start = polar(rChild, aChild);
+    const bend  = polar(rParent, aChild);
+    const end   = polar(rParent, aParent);
+    const diff  = aParent - aChild;
+    const largeArc = Math.abs(diff) > 180 ? 1 : 0;
+    const sweep = diff > 0 ? 1 : 0;
+    const stroke = dashed
+      ? `stroke="${color}" stroke-width="1.4" stroke-dasharray="3,4"`
+      : `stroke="${color}" stroke-width="2.4"`;
+    return `<path d="M ${start.x} ${start.y} L ${bend.x} ${bend.y} A ${rParent} ${rParent} 0 ${largeArc} ${sweep} ${end.x} ${end.y}" fill="none" ${stroke} stroke-linecap="round"/>`;
+  }
+
+  r32.forEach((m,j)=>{
+    const w = winnerOf(m);
+    const color = palette[j % palette.length];
+    const aHome = leafAngles[j*2], aAway = leafAngles[j*2+1];
+    const homeWin = w && w===m.home;
+    const awayWin = w && w===m.away;
+    svgParts.push(radialLink(R_LEAF,aHome,R_L1,l1Angles[j], homeWin?color:'#3A5548', !homeWin));
+    svgParts.push(radialLink(R_LEAF,aAway,R_L1,l1Angles[j], awayWin?color:'#3A5548', !awayWin));
+  });
+
+  for(let k=0;k<8;k++){ svgParts.push(radialLink(R_L1,l1Angles[k*2],R_L2,l2Angles[k],'#3A5548',true)); svgParts.push(radialLink(R_L1,l1Angles[k*2+1],R_L2,l2Angles[k],'#3A5548',true)); }
+  for(let m=0;m<4;m++){ svgParts.push(radialLink(R_L2,l2Angles[m*2],R_L3,l3Angles[m],'#3A5548',true)); svgParts.push(radialLink(R_L2,l2Angles[m*2+1],R_L3,l3Angles[m],'#3A5548',true)); }
+  for(let n=0;n<2;n++){ svgParts.push(radialLink(R_L3,l3Angles[n*2],R_L4,l4Angles[n],'#3A5548',true)); svgParts.push(radialLink(R_L3,l3Angles[n*2+1],R_L4,l4Angles[n],'#3A5548',true)); }
+  svgParts.push(radialLink(R_L4,l4Angles[0],R_L5,(l4Angles[0]+l4Angles[1])/2,'#3A5548',true));
+  svgParts.push(radialLink(R_L4,l4Angles[1],R_L5,(l4Angles[0]+l4Angles[1])/2,'#3A5548',true));
+
+  const level1Winners = r32.map((m,j) => {
+    const w = winnerOf(m);
+    if(!w) return null;
+    const score = w === m.home ? m.score?.[0] : m.score?.[1];
+    return { team:w, color: palette[j % palette.length], score };
+  });
+  const level2Winners = l2Angles.map(()=>null);
+  const level3Winners = l3Angles.map(()=>null);
+  const level4Winners = l4Angles.map(()=>null);
+
+// Windows doesn't render flag emoji the way iOS/macOS do, so we use real flag
+// image files instead (from flagcdn.com, a free public flag CDN) — same look
+// everywhere, no missing-glyph boxes on Windows.
+const FLAG_ISO = {
+  RSA:'za', CAN:'ca', NED:'nl', MAR:'ma', GER:'de', PAR:'py', FRA:'fr', SWE:'se',
+  BRA:'br', JPN:'jp', CIV:'ci', NOR:'no', MEX:'mx', ECU:'ec', ENG:'gb-eng', COD:'cd',
+  ESP:'es', AUT:'at', POR:'pt', CRO:'hr', BEL:'be', SEN:'sn', USA:'us', BIH:'ba',
+  AUS:'au', EGY:'eg', ARG:'ar', CPV:'cv', SUI:'ch', DZA:'dz', COL:'co', GHA:'gh',
+};
+function flagImg(code, cx, cy, size){
+  const iso = FLAG_ISO[code];
+  const r = size/2;
+  return `<image href="https://flagcdn.com/w80/${iso}.png" x="${cx-r}" y="${cy-r}" width="${size}" height="${size}" preserveAspectRatio="xMidYMid slice" style="clip-path:circle(50%)" />`;
+}
+
+function drawNode(angle, radius, winnerEntry){
+    const p = polar(radius, angle);
+    if(!winnerEntry) return `<circle cx="${p.x}" cy="${p.y}" r="3.4" fill="#3A5548"/>`;
+    const { team, color, score } = winnerEntry;
+    const lp = polar(radius + 22, angle);
+    let rot = angle, anchor = 'start';
+    if(angle > 90 && angle < 270){ rot = angle + 180; anchor = 'end'; }
+    const labelText = score !== undefined ? `${team.c} ${score}` : team.c;
+    return `<g class="qualified">
+      <circle cx="${p.x}" cy="${p.y}" r="13" fill="#0E241A" stroke="${color}" stroke-width="2.5"/>
+      ${flagImg(team.c, p.x, p.y, 22)}
+      <text x="${lp.x}" y="${lp.y}" font-size="9.5" font-family="DM Mono, monospace" fill="${color}" text-anchor="${anchor}" transform="rotate(${rot} ${lp.x} ${lp.y})">${labelText}</text>
+    </g>`;
+  }
+
+  l1Angles.forEach((a,j)=> svgParts.push(drawNode(a, R_L1, level1Winners[j])) );
+  l2Angles.forEach((a,k)=> svgParts.push(drawNode(a, R_L2, level2Winners[k])) );
+  l3Angles.forEach((a,m)=> svgParts.push(drawNode(a, R_L3, level3Winners[m])) );
+  l4Angles.forEach((a,n)=> svgParts.push(drawNode(a, R_L4, level4Winners[n])) );
+
+  r32.forEach((m,j)=>{
+    const w = winnerOf(m);
+    [{team:m.home, angle:leafAngles[j*2], score:m.score?.[0]},{team:m.away, angle:leafAngles[j*2+1], score:m.score?.[1]}].forEach(({team,angle,score})=>{
+      const p = polar(R_LEAF, angle);
+      const isWinner = w && team===w;
+      const isLoser = w && team!==w;
+      const ringColor = isWinner ? palette[j % palette.length] : (isLoser ? '#3A5548' : '#6E8577');
+      const opacity = isLoser ? 0.45 : 1;
+      const labelR = R_LEAF + 34;
+      const lp = polar(labelR, angle);
+      let rot = angle, anchor = 'start';
+      if(angle > 90 && angle < 270){ rot = angle + 180; anchor='end'; }
+      const labelText = (m.status === 'final' && score !== undefined) ? `${team.c} ${score}` : team.c;
+      svgParts.push(`<g opacity="${opacity}">
+        <circle cx="${p.x}" cy="${p.y}" r="16" fill="#0E241A" stroke="${ringColor}" stroke-width="2.5"/>
+        ${flagImg(team.c, p.x, p.y, 28)}
+        <text x="${lp.x}" y="${lp.y}" font-size="11" font-family="DM Mono, monospace" fill="${isWinner?'#D4A537':'#9FB3A8'}" text-anchor="${anchor}" transform="rotate(${rot} ${lp.x} ${lp.y})">${labelText}</text>
+      </g>`);
+    });
+  });
+
+  document.getElementById('wheel').innerHTML = `
+    <defs>
+      <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#D4A537" stop-opacity="0.55"/>
+        <stop offset="100%" stop-color="#D4A537" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    ${svgParts.join('')}
+    <circle cx="${CX}" cy="${CY}" r="60" fill="url(#glow)"/>
+    <text x="${CX}" y="${CY+14}" font-size="34" text-anchor="middle">🏆</text>
+  `;
+}
+
+// ---------- Live sync against ESPN's public World Cup scoreboard (no key required) ----------
+const TEAM_ALIASES = {
+  RSA:['rsa','south africa'], CAN:['can','canada'], NED:['ned','netherlands'], MAR:['mar','morocco'],
+  GER:['ger','germany'], PAR:['par','paraguay'], FRA:['fra','france'], SWE:['swe','sweden'],
+  BRA:['bra','brazil'], JPN:['jpn','japan'], CIV:['civ','ivory coast',"côte d'ivoire","cote d'ivoire"],
+  NOR:['nor','norway'], MEX:['mex','mexico'], ECU:['ecu','ecuador'], ENG:['eng','england'],
+  COD:['cod','congo dr','dr congo','congo'], ESP:['esp','spain'], AUT:['aut','austria'],
+  POR:['por','portugal'], CRO:['cro','croatia'], BEL:['bel','belgium'], SEN:['sen','senegal'],
+  USA:['usa','united states'], BIH:['bih','bosnia'], AUS:['aus','australia'], EGY:['egy','egypt'],
+  ARG:['arg','argentina'], CPV:['cpv','cape verde','cabo verde'], SUI:['sui','switzerland'],
+  DZA:['dza','alg','algeria'], COL:['col','colombia'], GHA:['gha','ghana'],
+};
+
+function teamMatches(code, espnTeam){
+  const aliases = TEAM_ALIASES[code] || [];
+  const abbr = (espnTeam.abbreviation || '').toLowerCase();
+  const disp = (espnTeam.displayName || '').toLowerCase();
+  return aliases.some(a => a === abbr || disp.includes(a));
+}
+
+async function fetchLiveEvents(){
+  // Same-origin call to our own serverless function — no CORS issue, no proxy needed.
+  const res = await fetch('/.netlify/functions/scores', { cache: 'no-store' });
+  if(!res.ok) throw new Error('scores function returned ' + res.status);
+  const json = await res.json();
+  return json.events || [];
+}
+
+function applyLiveEvents(r32, events){
+  let updated = 0;
+  r32.forEach(m => {
+    const ev = events.find(e => {
+      const comps = e.competitions?.[0]?.competitors;
+      if(!comps || comps.length !== 2) return false;
+      const [a,b] = comps;
+      return (teamMatches(m.home.c, a.team) && teamMatches(m.away.c, b.team)) ||
+             (teamMatches(m.home.c, b.team) && teamMatches(m.away.c, a.team));
+    });
+    if(!ev) return;
+    const comp = ev.competitions[0];
+    const completed = comp.status?.type?.completed;
+    if(!completed) return;
+    const comps = comp.competitors;
+    const homeC = comps.find(c => teamMatches(m.home.c, c.team));
+    const awayC = comps.find(c => teamMatches(m.away.c, c.team));
+    if(!homeC || !awayC) return;
+    const hs = Number(homeC.score), as = Number(awayC.score);
+    m.status = 'final';
+    m.score = [hs, as];
+    if(hs === as){
+      m.pk = true;
+      if(homeC.winner) m.winnerSide = 'home';
+      else if(awayC.winner) m.winnerSide = 'away';
+    } else {
+      delete m.pk;
+      delete m.winnerSide;
+    }
+    updated++;
+  });
+  return updated;
+}
+
+function cloneBase(){ return JSON.parse(JSON.stringify(baseR32)); }
+
+function setStatus(text){
+  document.getElementById('syncStatus').textContent = text;
+}
+
+let currentR32 = cloneBase();
+
+// Paint instantly with cache (if any) or the embedded snapshot, then try a live sync.
+try{
+  const cached = localStorage.getItem(CACHE_KEY);
+  if(cached){
+    const parsed = JSON.parse(cached);
+    currentR32 = parsed.r32;
+    renderWheel(currentR32);
+    setStatus('Showing cached results from ' + new Date(parsed.syncedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}));
+  } else {
+    renderWheel(currentR32);
+    setStatus('Showing latest built-in results…');
+  }
+}catch(e){
+  renderWheel(currentR32);
+}
+
+async function syncNow(){
+  setStatus('Syncing live scores…');
+  try{
+    const events = await fetchLiveEvents();
+    if(events.length === 0) throw new Error('no events returned');
+    const working = cloneBase();
+    applyLiveEvents(working, events);
+    currentR32 = working;
+    renderWheel(currentR32);
+    const now = Date.now();
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ r32: currentR32, syncedAt: now }));
+    setStatus('● Live — synced ' + new Date(now).toLocaleString('en-US',{hour:'2-digit',minute:'2-digit'}));
+  }catch(e){
+    setStatus('Live sync unavailable — showing last known results');
+  }
+}
+
+document.getElementById('syncBtn').addEventListener('click', syncNow);
+syncNow();
+setInterval(syncNow, 5 * 60 * 1000); // re-sync every 5 minutes while the page is open
+
+// ---------- Push notifications ----------
+// Public key only — safe to embed in client code. The matching private key
+// lives only in Netlify's environment variables, never shipped to the browser.
+const VAPID_PUBLIC_KEY = 'BD3CFLcV00rjMJYwfYLm_KC5dwMkTAZgg6279WVu1_IW4rjerKfl6xjMYPgr-5RdwQN9mUTwSgfkqOnexJljxXc';
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
+
+function setNotifyStatus(text){
+  const el = document.getElementById('notifyStatus');
+  if(el) el.textContent = text;
+}
+
+async function updateNotifyButton(){
+  const btn = document.getElementById('notifyBtn');
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)){
+    btn.textContent = '🔔 Not supported on this browser';
+    btn.disabled = true;
+    if (window.navigator.standalone === false) {
+      setNotifyStatus('On iPhone: open this from your Home Screen icon (not Safari directly) to enable notifications.');
+    }
+    return;
+  }
+  const reg = await navigator.serviceWorker.ready;
+  const existing = await reg.pushManager.getSubscription();
+  btn.textContent = existing ? '🔕 Disable notifications' : '🔔 Enable notifications';
+}
+
+async function toggleNotifications(){
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  const reg = await navigator.serviceWorker.ready;
+  const existing = await reg.pushManager.getSubscription();
+
+  if(existing){
+    try{
+      await fetch('/.netlify/functions/subscribe', {
+        method: 'DELETE',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ subscription: existing.toJSON() }),
+      });
+    }catch(e){ /* best effort */ }
+    await existing.unsubscribe();
+    setNotifyStatus('Notifications turned off.');
+    await updateNotifyButton();
+    return;
+  }
+
+  const permission = await Notification.requestPermission();
+  if(permission !== 'granted'){
+    setNotifyStatus('Permission was not granted — check your notification settings.');
+    return;
+  }
+
+  try{
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+    await fetch('/.netlify/functions/subscribe', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ subscription: sub.toJSON() }),
+    });
+    setNotifyStatus('You\'ll get a notification whenever a match finishes.');
+  }catch(e){
+    setNotifyStatus('Could not enable notifications on this device.');
+  }
+  await updateNotifyButton();
+}
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/sw.js').then(updateNotifyButton).catch(()=>{
+    setNotifyStatus('Service worker failed to register.');
+  });
+}
+document.getElementById('notifyBtn').addEventListener('click', toggleNotifications);
+
+document.getElementById('testNotifyBtn').addEventListener('click', async () => {
+  setNotifyStatus('Sending test notification…');
+  try{
+    const res = await fetch('/.netlify/functions/test-notify', { method: 'POST' });
+    const json = await res.json();
+    if(json.sent > 0){
+      setNotifyStatus(`Test sent to ${json.sent} device(s) — check your notifications.`);
+    } else {
+      setNotifyStatus(json.message || 'No subscribed devices to send to yet — tap Enable notifications first.');
+    }
+  }catch(e){
+    setNotifyStatus('Could not reach the test-notify function.');
+  }
+});
+
+</script>
+</body>
+</html>

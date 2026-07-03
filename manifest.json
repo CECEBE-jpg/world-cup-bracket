@@ -1,0 +1,9 @@
+{
+  "name": "World Cup 2026 Winners Tracker",
+  "short_name": "Winners Tracker",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#05100B",
+  "theme_color": "#05100B",
+  "icons": []
+}
