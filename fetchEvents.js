@@ -1,4 +1,4 @@
-const { getStore } = require('@netlify/blobs');
+const { getBlobStore } = require('./lib/blobStore');
 const webpush = require('web-push');
 
 const headers = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
@@ -6,11 +6,10 @@ const headers = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'applicati
 exports.handler = async function () {
   try {
     if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ error: 'VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY environment variables are not set' }),
-      };
+      return { statusCode: 500, headers, body: JSON.stringify({ error: 'VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY environment variables are not set' }) };
+    }
+    if (!process.env.NETLIFY_SITE_ID || !process.env.NETLIFY_AUTH_TOKEN) {
+      return { statusCode: 500, headers, body: JSON.stringify({ error: 'NETLIFY_SITE_ID / NETLIFY_AUTH_TOKEN environment variables are not set' }) };
     }
 
     webpush.setVapidDetails(
@@ -19,7 +18,7 @@ exports.handler = async function () {
       process.env.VAPID_PRIVATE_KEY
     );
 
-    const subStore = getStore('push-subscriptions');
+    const subStore = getBlobStore('push-subscriptions');
     const { blobs } = await subStore.list();
 
     if (blobs.length === 0) {
