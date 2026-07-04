@@ -301,6 +301,20 @@ function renderWheel(r32){
     return `<path d="M ${start.x} ${start.y} L ${bend.x} ${bend.y} A ${rParent} ${rParent} 0 ${largeArc} ${sweep} ${end.x} ${end.y}" fill="none" ${stroke} stroke-linecap="round"/>`;
   }
 
+  // Resolve every round's winners up front, so edge colors can reflect the
+  // full path a team has traveled, not just their first-round result.
+  const level1Winners = r32.map((m,j) => {
+    const w = winnerOf(m);
+    if(!w) return null;
+    const score = w === m.home ? m.score?.[0] : m.score?.[1];
+    return { team:w, color: palette[j % palette.length], score };
+  });
+  const level2Winners = resolveNextLevel(level1Winners, 8, lastEvents);
+  const level3Winners = resolveNextLevel(level2Winners, 4, lastEvents);
+  const level4Winners = resolveNextLevel(level3Winners, 2, lastEvents);
+  const champion = resolveNextLevel(level4Winners, 1, lastEvents)[0]; // null until the Final is actually decided
+
+  // R32 leaves -> R16 nodes
   r32.forEach((m,j)=>{
     const w = winnerOf(m);
     const color = palette[j % palette.length];
@@ -311,23 +325,28 @@ function renderWheel(r32){
     svgParts.push(radialLink(R_LEAF,aAway,R_L1,l1Angles[j], awayWin?color:'#3A5548', !awayWin));
   });
 
-  for(let k=0;k<8;k++){ svgParts.push(radialLink(R_L1,l1Angles[k*2],R_L2,l2Angles[k],'#3A5548',true)); svgParts.push(radialLink(R_L1,l1Angles[k*2+1],R_L2,l2Angles[k],'#3A5548',true)); }
-  for(let m=0;m<4;m++){ svgParts.push(radialLink(R_L2,l2Angles[m*2],R_L3,l3Angles[m],'#3A5548',true)); svgParts.push(radialLink(R_L2,l2Angles[m*2+1],R_L3,l3Angles[m],'#3A5548',true)); }
-  for(let n=0;n<2;n++){ svgParts.push(radialLink(R_L3,l3Angles[n*2],R_L4,l4Angles[n],'#3A5548',true)); svgParts.push(radialLink(R_L3,l3Angles[n*2+1],R_L4,l4Angles[n],'#3A5548',true)); }
-  svgParts.push(radialLink(R_L4,l4Angles[0],R_L5,(l4Angles[0]+l4Angles[1])/2,'#3A5548',true));
-  svgParts.push(radialLink(R_L4,l4Angles[1],R_L5,(l4Angles[0]+l4Angles[1])/2,'#3A5548',true));
+  // Generic: draws both edges feeding one node of the next round, colored
+  // gold-path style if that specific child actually advanced.
+  function drawFeederEdges(prevWinners, prevRadius, prevAngles, nextWinners, nextRadius, nextAngles, groupCount){
+    for(let i=0;i<groupCount;i++){
+      const childA = prevWinners[i*2], childB = prevWinners[i*2+1];
+      const advanced = nextWinners[i]; // the team (if any) that won this pairing
+      const aWon = advanced && childA && advanced.team === childA.team;
+      const bWon = advanced && childB && advanced.team === childB.team;
+      svgParts.push(radialLink(prevRadius, prevAngles[i*2], nextRadius, nextAngles[i], aWon ? advanced.color : '#3A5548', !aWon));
+      svgParts.push(radialLink(prevRadius, prevAngles[i*2+1], nextRadius, nextAngles[i], bWon ? advanced.color : '#3A5548', !bWon));
+    }
+  }
+  drawFeederEdges(level1Winners, R_L1, l1Angles, level2Winners, R_L2, l2Angles, 8);
+  drawFeederEdges(level2Winners, R_L2, l2Angles, level3Winners, R_L3, l3Angles, 4);
+  drawFeederEdges(level3Winners, R_L3, l3Angles, level4Winners, R_L4, l4Angles, 2);
 
-  const level1Winners = r32.map((m,j) => {
-    const w = winnerOf(m);
-    if(!w) return null;
-    const score = w === m.home ? m.score?.[0] : m.score?.[1];
-    return { team:w, color: palette[j % palette.length], score };
-  });
-  // R16, QF, and SF winners are resolved live — their participants aren't
-  // fixed at build time, only once the previous round's winners are known.
-  const level2Winners = resolveNextLevel(level1Winners, 8, lastEvents);
-  const level3Winners = resolveNextLevel(level2Winners, 4, lastEvents);
-  const level4Winners = resolveNextLevel(level3Winners, 2, lastEvents);
+  // Final: both semifinal winners converge on the trophy at center.
+  const finalAngle = (l4Angles[0]+l4Angles[1])/2;
+  const championAWon = champion && level4Winners[0] && champion.team === level4Winners[0].team;
+  const championBWon = champion && level4Winners[1] && champion.team === level4Winners[1].team;
+  svgParts.push(radialLink(R_L4,l4Angles[0],R_L5,finalAngle, championAWon ? champion.color : '#3A5548', !championAWon));
+  svgParts.push(radialLink(R_L4,l4Angles[1],R_L5,finalAngle, championBWon ? champion.color : '#3A5548', !championBWon));
 
 function flagImg(code, cx, cy, size){
   const iso = FLAG_ISO[code];
@@ -386,6 +405,11 @@ function drawNode(angle, radius, winnerEntry){
     ${svgParts.join('')}
     <circle cx="${CX}" cy="${CY}" r="60" fill="url(#glow)"/>
     <text x="${CX}" y="${CY+14}" font-size="34" text-anchor="middle">🏆</text>
+    ${champion ? `
+      <circle cx="${CX}" cy="${CY-46}" r="15" fill="#0E241A" stroke="${champion.color}" stroke-width="3"/>
+      ${flagImg(champion.team.c, CX, CY-46, 26)}
+      <text x="${CX}" y="${CY-66}" font-size="9.5" font-family="DM Mono, monospace" fill="#D4A537" text-anchor="middle" letter-spacing="1">CHAMPION</text>
+    ` : ''}
   `;
 }
 
