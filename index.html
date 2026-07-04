@@ -66,6 +66,60 @@
   .legend span{ display:inline-flex; align-items:center; gap:5px; }
   .legend i{ width:12px; height:2px; display:inline-block; }
 
+  .upcoming-section{
+    max-width: 520px;
+    margin: 28px auto 0;
+    padding: 0 16px;
+  }
+  .upcoming-title{
+    font-family:'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--gold);
+    text-align: center;
+    margin-bottom: 12px;
+  }
+  .upcoming-empty{
+    font-family:'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+    padding: 10px 0;
+  }
+  .upcoming-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap: 10px;
+    background: #0E241A;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+  }
+  .upcoming-teams{
+    display:flex;
+    align-items:center;
+    gap: 8px;
+    font-family:'Oswald', sans-serif;
+    font-size: 13px;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+  .upcoming-teams img{
+    width: 20px; height:20px; border-radius:50%; object-fit:cover;
+    box-shadow: 0 0 0 1px #3A5548;
+  }
+  .upcoming-vs{ color: var(--muted); font-size: 10px; margin: 0 2px; }
+  .upcoming-when{
+    font-family:'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-align: right;
+    white-space: nowrap;
+  }
+
   footer{
     margin: 22px 20px 0;
     padding-top: 12px;
@@ -95,6 +149,11 @@
   <span><i style="background:#3A5548;border-top:1px dashed #4E6459"></i> Not yet decided</span>
 </div>
 
+<div class="upcoming-section">
+  <div class="upcoming-title">Upcoming Matches</div>
+  <div id="upcomingList"></div>
+</div>
+
 <div style="text-align:center; margin-top:10px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
   <button id="syncBtn" style="font-family:'DM Mono',monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:#D4A537; background:transparent; border:1px solid #3A5548; border-radius:20px; padding:7px 16px; cursor:pointer;">↻ Sync now</button>
   <button id="notifyBtn" style="font-family:'DM Mono',monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:#D4A537; background:transparent; border:1px solid #3A5548; border-radius:20px; padding:7px 16px; cursor:pointer;">🔔 Enable notifications</button>
@@ -107,6 +166,17 @@
 </footer>
 
 <script>
+// Windows doesn't render flag emoji the way iOS/macOS do, so we use real flag
+// image files instead (from flagcdn.com, a free public flag CDN) — same look
+// everywhere, no missing-glyph boxes on Windows. Shared by the wheel and the
+// upcoming-matches list below it.
+const FLAG_ISO = {
+  RSA:'za', CAN:'ca', NED:'nl', MAR:'ma', GER:'de', PAR:'py', FRA:'fr', SWE:'se',
+  BRA:'br', JPN:'jp', CIV:'ci', NOR:'no', MEX:'mx', ECU:'ec', ENG:'gb-eng', COD:'cd',
+  ESP:'es', AUT:'at', POR:'pt', CRO:'hr', BEL:'be', SEN:'sn', USA:'us', BIH:'ba',
+  AUS:'au', EGY:'eg', ARG:'ar', CPV:'cv', SUI:'ch', DZA:'dz', COL:'co', GHA:'gh',
+};
+
 // Base snapshot — used instantly on load, then overwritten by live results if the sync succeeds.
 const baseR32 = [
   {id:'M1', home:{n:'South Africa', c:'RSA', f:'🇿🇦'}, away:{n:'Canada', c:'CAN', f:'🇨🇦'}, score:[0,1], status:'final'},
@@ -121,19 +191,76 @@ const baseR32 = [
   {id:'M10', home:{n:'Portugal', c:'POR', f:'🇵🇹'}, away:{n:'Croatia', c:'CRO', f:'🇭🇷'}, score:[2,1], status:'final'},
   {id:'M11', home:{n:'Belgium', c:'BEL', f:'🇧🇪'}, away:{n:'Senegal', c:'SEN', f:'🇸🇳'}, score:[3,2], status:'final'},
   {id:'M12', home:{n:'USA', c:'USA', f:'🇺🇸'}, away:{n:'Bosnia & Herz.', c:'BIH', f:'🇧🇦'}, score:[2,0], status:'final'},
-  {id:'M13', home:{n:'Australia', c:'AUS', f:'🇦🇺'}, away:{n:'Egypt', c:'EGY', f:'🇪🇬'}, status:'scheduled'},
-  {id:'M14', home:{n:'Argentina', c:'ARG', f:'🇦🇷'}, away:{n:'Cape Verde', c:'CPV', f:'🇨🇻'}, status:'scheduled'},
+  {id:'M13', home:{n:'Australia', c:'AUS', f:'🇦🇺'}, away:{n:'Egypt', c:'EGY', f:'🇪🇬'}, score:[1,1], status:'final', pk:true, winnerSide:'away'},
+  {id:'M14', home:{n:'Argentina', c:'ARG', f:'🇦🇷'}, away:{n:'Cape Verde', c:'CPV', f:'🇨🇻'}, score:[3,2], status:'final'},
   {id:'M15', home:{n:'Switzerland', c:'SUI', f:'🇨🇭'}, away:{n:'Algeria', c:'DZA', f:'🇩🇿'}, score:[2,0], status:'final'},
-  {id:'M16', home:{n:'Colombia', c:'COL', f:'🇨🇴'}, away:{n:'Ghana', c:'GHA', f:'🇬🇭'}, status:'scheduled'},
+  {id:'M16', home:{n:'Colombia', c:'COL', f:'🇨🇴'}, away:{n:'Ghana', c:'GHA', f:'🇬🇭'}, score:[1,0], status:'final'},
 ];
 
 const CACHE_KEY = 'wc2026-bracket-cache-v1';
+
+// Holds the most recent successful live-events fetch, so later rounds (R16+)
+// can be resolved dynamically — their participants aren't known until we
+// compute them from R32 winners, so they can't be hardcoded like R32 can.
+let lastEvents = [];
 
 function winnerOf(m){
   if(m.status !== 'final') return null;
   if(m.winnerSide) return m.winnerSide === 'home' ? m.home : m.away;
   if(m.score[0] === m.score[1]) return null; // equal score, no winner flag known yet
   return m.score[0] > m.score[1] ? m.home : m.away;
+}
+
+// Looks through live events for a match between two specific team codes,
+// regardless of which round it belongs to. Used to resolve R16/QF/SF/Final
+// once we know who's actually playing, since that's only knowable at runtime.
+function findMatchResult(events, codeA, codeB){
+  if(!codeA || !codeB) return null;
+  const ev = (events || []).find(e => {
+    const comps = e.competitions?.[0]?.competitors;
+    if(!comps || comps.length !== 2) return false;
+    const [a,b] = comps;
+    return (teamMatches(codeA,a.team) && teamMatches(codeB,b.team)) ||
+           (teamMatches(codeA,b.team) && teamMatches(codeB,a.team));
+  });
+  if(!ev) return null;
+  const comp = ev.competitions[0];
+  const completed = comp.status?.type?.completed;
+  const compA = comp.competitors.find(c => teamMatches(codeA, c.team));
+  const compB = comp.competitors.find(c => teamMatches(codeB, c.team));
+  if(!compA || !compB) return null;
+  const scoreA = Number(compA.score), scoreB = Number(compB.score);
+  let winnerCode = null;
+  if(completed){
+    if(scoreA === scoreB){
+      if(compA.winner) winnerCode = codeA;
+      else if(compB.winner) winnerCode = codeB;
+    } else {
+      winnerCode = scoreA > scoreB ? codeA : codeB;
+    }
+  }
+  return { completed, scoreA, scoreB, winnerCode };
+}
+
+// Given one round's resolved winners, finds each pair's live result (if any)
+// to produce the next round's winners — same shape as level1Winners, so
+// drawNode() and the rest of the rendering code work unchanged for every round.
+function resolveNextLevel(prevWinners, groupCount, events){
+  const result = [];
+  for(let i=0;i<groupCount;i++){
+    const a = prevWinners[i*2];
+    const b = prevWinners[i*2+1];
+    if(!a || !b){ result.push(null); continue; }
+    const res = findMatchResult(events, a.team.c, b.team.c);
+    if(res && res.completed && res.winnerCode){
+      const winnerEntry = res.winnerCode === a.team.c ? a : b;
+      const score = res.winnerCode === a.team.c ? res.scoreA : res.scoreB;
+      result.push({ team: winnerEntry.team, color: winnerEntry.color, score });
+    } else {
+      result.push(null);
+    }
+  }
+  return result;
 }
 
 // ---------- Rendering (pure function of an r32 array) ----------
@@ -196,19 +323,12 @@ function renderWheel(r32){
     const score = w === m.home ? m.score?.[0] : m.score?.[1];
     return { team:w, color: palette[j % palette.length], score };
   });
-  const level2Winners = l2Angles.map(()=>null);
-  const level3Winners = l3Angles.map(()=>null);
-  const level4Winners = l4Angles.map(()=>null);
+  // R16, QF, and SF winners are resolved live — their participants aren't
+  // fixed at build time, only once the previous round's winners are known.
+  const level2Winners = resolveNextLevel(level1Winners, 8, lastEvents);
+  const level3Winners = resolveNextLevel(level2Winners, 4, lastEvents);
+  const level4Winners = resolveNextLevel(level3Winners, 2, lastEvents);
 
-// Windows doesn't render flag emoji the way iOS/macOS do, so we use real flag
-// image files instead (from flagcdn.com, a free public flag CDN) — same look
-// everywhere, no missing-glyph boxes on Windows.
-const FLAG_ISO = {
-  RSA:'za', CAN:'ca', NED:'nl', MAR:'ma', GER:'de', PAR:'py', FRA:'fr', SWE:'se',
-  BRA:'br', JPN:'jp', CIV:'ci', NOR:'no', MEX:'mx', ECU:'ec', ENG:'gb-eng', COD:'cd',
-  ESP:'es', AUT:'at', POR:'pt', CRO:'hr', BEL:'be', SEN:'sn', USA:'us', BIH:'ba',
-  AUS:'au', EGY:'eg', ARG:'ar', CPV:'cv', SUI:'ch', DZA:'dz', COL:'co', GHA:'gh',
-};
 function flagImg(code, cx, cy, size){
   const iso = FLAG_ISO[code];
   const r = size/2;
@@ -337,6 +457,51 @@ function setStatus(text){
   document.getElementById('syncStatus').textContent = text;
 }
 
+// Map an ESPN team object back to our internal 3-letter code, reusing the
+// same alias table used to match final scores, so flags/codes stay consistent.
+function resolveInternalCode(espnTeam){
+  for(const code of Object.keys(TEAM_ALIASES)){
+    if(teamMatches(code, espnTeam)) return code;
+  }
+  return null;
+}
+
+function renderUpcoming(events){
+  const container = document.getElementById('upcomingList');
+  if(!container) return;
+
+  const upcoming = (events || [])
+    .filter(e => !e.competitions?.[0]?.status?.type?.completed)
+    .map(e => {
+      const comp = e.competitions[0];
+      const home = comp.competitors.find(c => c.homeAway === 'home');
+      const away = comp.competitors.find(c => c.homeAway === 'away');
+      return { date: new Date(e.date), home, away };
+    })
+    .sort((a,b) => a.date - b.date);
+
+  if(upcoming.length === 0){
+    container.innerHTML = '<div class="upcoming-empty">No upcoming matches confirmed yet — check back after the next sync.</div>';
+    return;
+  }
+
+  function teamHTML(team){
+    const code = resolveInternalCode(team.team) || team.team.abbreviation;
+    const iso = FLAG_ISO[code];
+    const img = iso ? `<img src="https://flagcdn.com/w40/${iso}.png" alt="">` : '';
+    return `${img}<span>${code}</span>`;
+  }
+
+  container.innerHTML = upcoming.map(m => `
+    <div class="upcoming-row">
+      <div class="upcoming-teams">
+        ${teamHTML(m.home)}<span class="upcoming-vs">vs</span>${teamHTML(m.away)}
+      </div>
+      <div class="upcoming-when">${m.date.toLocaleString('en-US', { weekday:'short', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</div>
+    </div>
+  `).join('');
+}
+
 let currentR32 = cloneBase();
 
 // Paint instantly with cache (if any) or the embedded snapshot, then try a live sync.
@@ -345,10 +510,13 @@ try{
   if(cached){
     const parsed = JSON.parse(cached);
     currentR32 = parsed.r32;
+    if(parsed.events) lastEvents = parsed.events;
     renderWheel(currentR32);
+    if(parsed.events) renderUpcoming(parsed.events);
     setStatus('Showing cached results from ' + new Date(parsed.syncedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}));
   } else {
     renderWheel(currentR32);
+    renderUpcoming([]);
     setStatus('Showing latest built-in results…');
   }
 }catch(e){
@@ -363,14 +531,17 @@ async function syncNow(){
     const working = cloneBase();
     applyLiveEvents(working, events);
     currentR32 = working;
+    lastEvents = events;
     renderWheel(currentR32);
+    renderUpcoming(events);
     const now = Date.now();
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ r32: currentR32, syncedAt: now }));
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ r32: currentR32, events, syncedAt: now }));
     setStatus('● Live — synced ' + new Date(now).toLocaleString('en-US',{hour:'2-digit',minute:'2-digit'}));
   }catch(e){
     setStatus('Live sync unavailable — showing last known results');
   }
 }
+
 
 document.getElementById('syncBtn').addEventListener('click', syncNow);
 syncNow();

@@ -1,4 +1,4 @@
-const { getStore } = require('@netlify/blobs');
+const { getBlobStore } = require('./lib/blobStore');
 const crypto = require('crypto');
 
 function keyFor(subscription) {
@@ -22,6 +22,14 @@ exports.handler = async function (event) {
       return { statusCode: 405, headers, body: JSON.stringify({ error: 'method not allowed' }) };
     }
 
+    if (!process.env.NETLIFY_SITE_ID || !process.env.NETLIFY_AUTH_TOKEN) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'NETLIFY_SITE_ID / NETLIFY_AUTH_TOKEN environment variables are not set' }),
+      };
+    }
+
     let body;
     try {
       body = JSON.parse(event.body || '{}');
@@ -34,7 +42,7 @@ exports.handler = async function (event) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'missing subscription.endpoint' }) };
     }
 
-    const store = getStore('push-subscriptions');
+    const store = getBlobStore('push-subscriptions');
 
     if (event.httpMethod === 'POST') {
       await store.setJSON(keyFor(subscription), subscription);
@@ -46,7 +54,6 @@ exports.handler = async function (event) {
     return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
 
   } catch (e) {
-    // Logged so it shows up in the Netlify Functions log for this invocation.
     console.error('subscribe function error:', e);
     return {
       statusCode: 500,
