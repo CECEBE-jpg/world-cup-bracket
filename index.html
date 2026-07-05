@@ -29,13 +29,33 @@
     padding: 0 16px 14px;
     text-align:center;
   }
+  .header-top{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    position:relative;
+    margin-bottom:4px;
+  }
+  #viewerBadge{
+    position:absolute;
+    left:0;
+    display:flex;
+    align-items:center;
+    gap:5px;
+    background:transparent;
+    border:1px solid var(--gold);
+    border-radius:16px;
+    padding:4px 12px;
+    font-family:'DM Mono', monospace;
+    font-size:11px;
+    color: var(--gold);
+  }
   .eyebrow{
     font-family:'DM Mono', monospace;
     font-size:10.5px;
     letter-spacing:0.2em;
     text-transform:uppercase;
     color: var(--gold);
-    margin-bottom:4px;
   }
   h1{ font-size:22px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; }
   .sub{ font-family:'DM Mono', monospace; font-size:10.5px; color:var(--muted); margin-top:6px; }
@@ -94,8 +114,8 @@
     gap: 10px;
     background: #0E241A;
     border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 10px 14px;
+    border-radius: 14px;
+    padding: 10px 16px;
     margin-bottom: 8px;
   }
   .upcoming-teams{
@@ -115,9 +135,23 @@
   .upcoming-when{
     font-family:'DM Mono', monospace;
     font-size: 10px;
-    color: var(--muted);
+    color: #4CAF7D;
     text-align: right;
     white-space: nowrap;
+  }
+  .upcoming-more-btn{
+    display:block;
+    margin: 4px auto 0;
+    font-family:'DM Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #4CAF7D;
+    background: transparent;
+    border: 1px solid #4CAF7D;
+    border-radius: 20px;
+    padding: 6px 18px;
+    cursor: pointer;
   }
 
   footer{
@@ -134,12 +168,13 @@
 </head>
 <body>
 
-<div id="viewerBadge" style="position:fixed; top:12px; left:12px; z-index:10; display:flex; align-items:center; gap:5px; background:rgba(14,36,26,0.85); border:1px solid #3A5548; border-radius:16px; padding:5px 11px; font-family:'DM Mono',monospace; font-size:11px; color:#D4A537; backdrop-filter: blur(4px);">
-  <span aria-hidden="true">👁</span><span id="viewerCount">–</span>
-</div>
-
 <header>
-  <div class="eyebrow">FIFA World Cup 2026 · Knockout Wheel</div>
+  <div class="header-top">
+    <div id="viewerBadge">
+      <span aria-hidden="true">👁</span><span id="viewerCount">–</span>
+    </div>
+    <div class="eyebrow">FIFA World Cup 2026 · Knockout Wheel</div>
+  </div>
   <h1>Winners Tracker</h1>
   <div class="sub" id="syncStatus">Loading…</div>
 </header>
@@ -167,7 +202,7 @@
 <div id="notifyStatus" style="text-align:center; margin-top:8px; font-family:'DM Mono',monospace; font-size:9.5px; color:#4E6459;"></div>
 
 <footer id="footerNote">
-  This syncs live scores automatically every few minutes via its own scores function, so it should stay current on its own. If a sync ever fails, it keeps showing the last results it saw — tap "Sync now" any time to retry, or ask Claude to rebuild the file.
+  This syncs live scores automatically every few minutes via its own scores function, so it should stay current on its own. If a sync ever fails, it keeps showing the last results it saw — tap "Sync now" any time to retry.
 </footer>
 
 <script>
@@ -463,8 +498,11 @@ function drawNode(angle, radius, winnerEntry, eliminatedInfo, isLatest){
     const lp = polar(radius + 22, angle);
     let rot = angle, anchor = 'start';
     if(angle > 90 && angle < 270){ rot = angle + 180; anchor = 'end'; }
-    return `<g class="${isEliminatedHere ? '' : 'qualified'}" opacity="${opacity}">
-      <circle cx="${p.x}" cy="${p.y}" r="13" fill="#0E241A" stroke="${ringColor}" stroke-width="2.5"/>
+    // The background disc is always fully opaque — drawn outside the
+    // translucent group — so no path can ever show through a dimmed flag.
+    return `<circle cx="${p.x}" cy="${p.y}" r="13" fill="#0E241A"/>
+    <g class="${isEliminatedHere ? '' : 'qualified'}" opacity="${opacity}">
+      <circle cx="${p.x}" cy="${p.y}" r="13" fill="none" stroke="${ringColor}" stroke-width="2.5"/>
       ${flagImg(team.c, p.x, p.y, 22)}
       <text x="${lp.x}" y="${lp.y}" font-size="9.5" font-family="DM Mono, monospace" fill="${ringColor}" text-anchor="${anchor}" transform="rotate(${rot} ${lp.x} ${lp.y})">${team.c}</text>
     </g>`;
@@ -485,18 +523,21 @@ function drawNode(angle, radius, winnerEntry, eliminatedInfo, isLatest){
     [{team:m.home, angle:leafAngles[j*2]},{team:m.away, angle:leafAngles[j*2+1]}].forEach(({team,angle})=>{
       const p = polar(R_LEAF, angle);
       const elim = eliminatedMap.get(team.c);
-      const isEliminatedHere = elim && elim.level === 0;
+      const isEliminatedAnywhere = !!elim; // dim the starting flag once they're out, at any round
       const isWinner = w && team===w;
-      const ringColor = isEliminatedHere ? ELIMINATED_COLOR : (isWinner ? palette[j % palette.length] : '#6E8577');
+      const ringColor = isEliminatedAnywhere ? ELIMINATED_COLOR : (isWinner ? palette[j % palette.length] : '#6E8577');
 
-      const opacity = isEliminatedHere ? 0.45 : 1;
+      const opacity = isEliminatedAnywhere ? 0.45 : 1;
       const labelR = R_LEAF + 34;
       const lp = polar(labelR, angle);
       let rot = angle, anchor = 'start';
       if(angle > 90 && angle < 270){ rot = angle + 180; anchor='end'; }
-      const labelColor = isEliminatedHere ? ELIMINATED_COLOR : (isWinner?'#D4A537':'#9FB3A8');
-      svgParts.push(`<g opacity="${opacity}">
-        <circle cx="${p.x}" cy="${p.y}" r="16" fill="#0E241A" stroke="${ringColor}" stroke-width="2.5"/>
+      const labelColor = isEliminatedAnywhere ? ELIMINATED_COLOR : (isWinner?'#D4A537':'#9FB3A8');
+      // Background disc stays fully opaque outside the translucent group so
+      // no dashed path can ever show through a dimmed flag.
+      svgParts.push(`<circle cx="${p.x}" cy="${p.y}" r="16" fill="#0E241A"/>
+      <g opacity="${opacity}">
+        <circle cx="${p.x}" cy="${p.y}" r="16" fill="none" stroke="${ringColor}" stroke-width="2.5"/>
         ${flagImg(team.c, p.x, p.y, 28)}
         <text x="${lp.x}" y="${lp.y}" font-size="11" font-family="DM Mono, monospace" fill="${labelColor}" text-anchor="${anchor}" transform="rotate(${rot} ${lp.x} ${lp.y})">${team.c}</text>
       </g>`);
@@ -624,14 +665,34 @@ function renderUpcoming(events){
     return `${img}<span>${code}</span>`;
   }
 
-  container.innerHTML = upcoming.map(m => `
-    <div class="upcoming-row">
+  function rowHTML(m){
+    return `<div class="upcoming-row">
       <div class="upcoming-teams">
         ${teamHTML(m.home)}<span class="upcoming-vs">vs</span>${teamHTML(m.away)}
       </div>
       <div class="upcoming-when">${m.date.toLocaleString('en-US', { weekday:'short', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</div>
-    </div>
-  `).join('');
+    </div>`;
+  }
+
+  const VISIBLE_DEFAULT = 3;
+  const rowsHTML = upcoming.map(rowHTML).join('');
+  const hasMore = upcoming.length > VISIBLE_DEFAULT;
+
+  container.innerHTML = `
+    <div id="upcomingVisible">${upcoming.slice(0, VISIBLE_DEFAULT).map(rowHTML).join('')}</div>
+    <div id="upcomingRest" style="display:none;">${upcoming.slice(VISIBLE_DEFAULT).map(rowHTML).join('')}</div>
+    ${hasMore ? `<button id="upcomingMoreBtn" class="upcoming-more-btn">⌄ Show more</button>` : ''}
+  `;
+
+  if(hasMore){
+    document.getElementById('upcomingMoreBtn').addEventListener('click', () => {
+      const rest = document.getElementById('upcomingRest');
+      const btn = document.getElementById('upcomingMoreBtn');
+      const expanded = rest.style.display !== 'none';
+      rest.style.display = expanded ? 'none' : 'block';
+      btn.textContent = expanded ? '⌄ Show more' : '⌃ Show less';
+    });
+  }
 }
 
 let currentR32 = cloneBase();
