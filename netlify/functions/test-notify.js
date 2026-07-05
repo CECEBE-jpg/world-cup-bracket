@@ -27,7 +27,7 @@ exports.handler = async function () {
 
     const payload = JSON.stringify({
       title: 'World Cup Bracket',
-      body: '🔔 Test notification — if you can see this, it works!',
+      body: 'Match A vs B has ended! Tap to view results now.',
     });
 
     let sent = 0;

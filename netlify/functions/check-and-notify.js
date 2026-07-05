@@ -10,7 +10,7 @@ function describeMatch(ev) {
   return {
     id: ev.id,
     // Deliberately no score or winner here — open the app to see the result.
-    text: `${home.team.abbreviation} vs ${away.team.abbreviation} has ended. Open the app to see who won!`,
+    text: `Match ${home.team.abbreviation} vs ${away.team.abbreviation} has ended! Tap to view results now.`,
   };
 }
 
