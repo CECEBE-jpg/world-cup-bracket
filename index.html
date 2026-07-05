@@ -415,8 +415,9 @@ function renderWheel(r32){
   drawFeederEdges(level2Winners, R_L2, l2Angles, level3Winners, R_L3, l3Angles, 4, 2);
   drawFeederEdges(level3Winners, R_L3, l3Angles, level4Winners, R_L4, l4Angles, 2, 3);
 
-  // Final: both semifinal winners converge on the trophy at center.
-  const finalAngle = (l4Angles[0]+l4Angles[1])/2;
+  // Final: each finalist's path ends at its own separate dot, purely radial
+  // (same angle start-to-end, no bend) — the two sides never connect to each
+  // other or to the trophy; there's just a clean gap in between, by design.
   function finalEdgeInfo(child){
     if(!child) return { color:'#3A5548', dashed:true, score: undefined };
     const elim = eliminatedMap.get(child.team.c);
@@ -424,18 +425,21 @@ function renderWheel(r32){
     if(champion && champion.team === child.team) return { color: child.color, dashed: false, score: champion.score };
     return { color: '#3A5548', dashed: true, score: undefined };
   }
-  const infoF0 = finalEdgeInfo(level4Winners[0]);
-  const infoF1 = finalEdgeInfo(level4Winners[1]);
-  svgParts.push(drawEdgeWithScore(R_L4,l4Angles[0],R_L5,finalAngle, infoF0.color, infoF0.dashed, infoF0.score));
-  svgParts.push(drawEdgeWithScore(R_L4,l4Angles[1],R_L5,finalAngle, infoF1.color, infoF1.dashed, infoF1.score));
-
-  // A clear stopping point for the Final — the flag itself moves on to the
-  // champion display at center, so this is just a dot, not a repeated flag.
-  {
-    const fp = polar(R_L5, finalAngle);
-    const dotColor = champion ? champion.color : '#3A5548';
-    svgParts.push(`<circle cx="${fp.x}" cy="${fp.y}" r="5" fill="${dotColor}" stroke="#0E241A" stroke-width="1"/>`);
+  function straightLink(r1, a1, r2, a2, color, dashed){
+    const p1 = polar(r1, a1), p2 = polar(r2, a2);
+    const stroke = dashed
+      ? `stroke="${color}" stroke-width="1.4" stroke-dasharray="3,4"`
+      : `stroke="${color}" stroke-width="2.4"`;
+    return `<path d="M ${p1.x} ${p1.y} L ${p2.x} ${p2.y}" fill="none" ${stroke} stroke-linecap="round"/>`;
   }
+  [level4Winners[0], level4Winners[1]].forEach((child, idx) => {
+    const angle = l4Angles[idx];
+    const info = finalEdgeInfo(child);
+    svgParts.push(straightLink(R_L4, angle, R_L5, angle, info.color, info.dashed));
+    if(info.score !== undefined) svgParts.push(scoreBadge((R_L4+R_L5)/2, angle, info.score, info.color));
+    const dotP = polar(R_L5, angle);
+    svgParts.push(`<circle cx="${dotP.x}" cy="${dotP.y}" r="5" fill="${info.color}" stroke="#0E241A" stroke-width="1"/>`);
+  });
 
 function flagImg(code, cx, cy, size){
   const iso = FLAG_ISO[code];
@@ -484,12 +488,6 @@ function drawNode(angle, radius, winnerEntry, eliminatedInfo, isLatest){
       const isEliminatedHere = elim && elim.level === 0;
       const isWinner = w && team===w;
       const ringColor = isEliminatedHere ? ELIMINATED_COLOR : (isWinner ? palette[j % palette.length] : '#6E8577');
-
-      if(isWinner && computeLatestLevel(team.c) > 0){
-        // They've moved on to a later round — leave a small dot here instead of repeating the flag.
-        svgParts.push(`<circle cx="${p.x}" cy="${p.y}" r="5" fill="${palette[j % palette.length]}" stroke="#0E241A" stroke-width="1"/>`);
-        return;
-      }
 
       const opacity = isEliminatedHere ? 0.45 : 1;
       const labelR = R_LEAF + 34;
