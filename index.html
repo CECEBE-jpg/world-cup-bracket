@@ -313,6 +313,22 @@ function renderWheel(r32){
     return `<path d="M ${start.x} ${start.y} L ${bend.x} ${bend.y} A ${rParent} ${rParent} 0 ${largeArc} ${sweep} ${end.x} ${end.y}" fill="none" ${stroke} stroke-linecap="round"/>`;
   }
 
+  // A small circular score badge sitting right at a path's bend point —
+  // one per team per match, colored to match that team's path at this leg
+  // (their win color if they advanced, green if this is where they lost).
+  function scoreBadge(rParent, aChild, score, color){
+    const p = polar(rParent, aChild);
+    const r = 11;
+    return `<circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${color}" stroke="#0E241A" stroke-width="1.6"/>
+      <text x="${p.x}" y="${p.y+4}" font-size="11" font-family="DM Mono, monospace" fill="#0E241A" text-anchor="middle" font-weight="700">${score}</text>`;
+  }
+
+  function drawEdgeWithScore(rChild, aChild, rParent, aParent, color, dashed, score){
+    let out = radialLink(rChild, aChild, rParent, aParent, color, dashed);
+    if(score !== undefined && score !== null) out += scoreBadge(rParent, aChild, score, color);
+    return out;
+  }
+
   // A dedicated color for "confirmed eliminated", distinct from the neutral
   // grey used for "not yet decided" and from the active win-path palette.
   const ELIMINATED_COLOR = '#3F9E6B';
@@ -344,42 +360,43 @@ function renderWheel(r32){
   const level4Winners = resolveNextLevel(level3Winners, 2, lastEvents, eliminatedMap, 3);
   const champion = resolveNextLevel(level4Winners, 1, lastEvents, eliminatedMap, 4)[0]; // null until the Final is decided
 
-  // R32 leaves -> R16 nodes. A confirmed loss (level 0) renders green+dashed;
-  // an active win stays solid in that match's color; anything undecided is grey.
+  // R32 leaves -> R16 nodes. A confirmed loss (level 0) renders green+dashed
+  // with the losing score badged on the path; an active win stays solid in
+  // that match's color with the winning score badged the same way.
   r32.forEach((m,j)=>{
     const w = winnerOf(m);
     const color = palette[j % palette.length];
     const aHome = leafAngles[j*2], aAway = leafAngles[j*2+1];
-    function leafEdgeStyle(team){
+    function leafEdgeInfo(team, ownScore){
       const elim = eliminatedMap.get(team.c);
-      if(elim && elim.level === 0) return { color: ELIMINATED_COLOR, dashed: true };
-      if(w && w === team) return { color, dashed: false };
-      return { color: '#3A5548', dashed: true };
+      const played = m.status === 'final';
+      if(elim && elim.level === 0) return { color: ELIMINATED_COLOR, dashed: true, score: played ? ownScore : undefined };
+      if(w && w === team) return { color, dashed: false, score: played ? ownScore : undefined };
+      return { color: '#3A5548', dashed: true, score: undefined };
     }
-    const styleHome = leafEdgeStyle(m.home);
-    const styleAway = leafEdgeStyle(m.away);
-    svgParts.push(radialLink(R_LEAF,aHome,R_L1,l1Angles[j], styleHome.color, styleHome.dashed));
-    svgParts.push(radialLink(R_LEAF,aAway,R_L1,l1Angles[j], styleAway.color, styleAway.dashed));
+    const infoHome = leafEdgeInfo(m.home, m.score?.[0]);
+    const infoAway = leafEdgeInfo(m.away, m.score?.[1]);
+    svgParts.push(drawEdgeWithScore(R_LEAF,aHome,R_L1,l1Angles[j], infoHome.color, infoHome.dashed, infoHome.score));
+    svgParts.push(drawEdgeWithScore(R_LEAF,aAway,R_L1,l1Angles[j], infoAway.color, infoAway.dashed, infoAway.score));
   });
 
-  // Generic: draws both edges feeding one node of the next round. A team
-  // eliminated exactly at targetLevel renders green+dashed (their run just
-  // ended here); an active advance stays solid; anything else is grey.
+  // Generic: draws both edges feeding one node of the next round, badging
+  // each with that specific team's own score in the match at this leg.
   function drawFeederEdges(prevWinners, prevRadius, prevAngles, nextWinners, nextRadius, nextAngles, groupCount, targetLevel){
-    function edgeStyle(child, advanced){
-      if(!child) return { color:'#3A5548', dashed:true };
+    function edgeInfo(child, advanced){
+      if(!child) return { color:'#3A5548', dashed:true, score: undefined };
       const elim = eliminatedMap.get(child.team.c);
-      if(elim && elim.level === targetLevel) return { color: ELIMINATED_COLOR, dashed: true };
-      if(advanced && advanced.team === child.team) return { color: child.color, dashed: false };
-      return { color: '#3A5548', dashed: true };
+      if(elim && elim.level === targetLevel) return { color: ELIMINATED_COLOR, dashed: true, score: elim.score };
+      if(advanced && advanced.team === child.team) return { color: child.color, dashed: false, score: advanced.score };
+      return { color: '#3A5548', dashed: true, score: undefined };
     }
     for(let i=0;i<groupCount;i++){
       const childA = prevWinners[i*2], childB = prevWinners[i*2+1];
       const advanced = nextWinners[i];
-      const styleA = edgeStyle(childA, advanced);
-      const styleB = edgeStyle(childB, advanced);
-      svgParts.push(radialLink(prevRadius, prevAngles[i*2], nextRadius, nextAngles[i], styleA.color, styleA.dashed));
-      svgParts.push(radialLink(prevRadius, prevAngles[i*2+1], nextRadius, nextAngles[i], styleB.color, styleB.dashed));
+      const infoA = edgeInfo(childA, advanced);
+      const infoB = edgeInfo(childB, advanced);
+      svgParts.push(drawEdgeWithScore(prevRadius, prevAngles[i*2], nextRadius, nextAngles[i], infoA.color, infoA.dashed, infoA.score));
+      svgParts.push(drawEdgeWithScore(prevRadius, prevAngles[i*2+1], nextRadius, nextAngles[i], infoB.color, infoB.dashed, infoB.score));
     }
   }
   drawFeederEdges(level1Winners, R_L1, l1Angles, level2Winners, R_L2, l2Angles, 8, 1);
@@ -388,17 +405,17 @@ function renderWheel(r32){
 
   // Final: both semifinal winners converge on the trophy at center.
   const finalAngle = (l4Angles[0]+l4Angles[1])/2;
-  function finalEdgeStyle(child){
-    if(!child) return { color:'#3A5548', dashed:true };
+  function finalEdgeInfo(child){
+    if(!child) return { color:'#3A5548', dashed:true, score: undefined };
     const elim = eliminatedMap.get(child.team.c);
-    if(elim && elim.level === 4) return { color: ELIMINATED_COLOR, dashed: true };
-    if(champion && champion.team === child.team) return { color: child.color, dashed: false };
-    return { color: '#3A5548', dashed: true };
+    if(elim && elim.level === 4) return { color: ELIMINATED_COLOR, dashed: true, score: elim.score };
+    if(champion && champion.team === child.team) return { color: child.color, dashed: false, score: champion.score };
+    return { color: '#3A5548', dashed: true, score: undefined };
   }
-  const styleF0 = finalEdgeStyle(level4Winners[0]);
-  const styleF1 = finalEdgeStyle(level4Winners[1]);
-  svgParts.push(radialLink(R_L4,l4Angles[0],R_L5,finalAngle, styleF0.color, styleF0.dashed));
-  svgParts.push(radialLink(R_L4,l4Angles[1],R_L5,finalAngle, styleF1.color, styleF1.dashed));
+  const infoF0 = finalEdgeInfo(level4Winners[0]);
+  const infoF1 = finalEdgeInfo(level4Winners[1]);
+  svgParts.push(drawEdgeWithScore(R_L4,l4Angles[0],R_L5,finalAngle, infoF0.color, infoF0.dashed, infoF0.score));
+  svgParts.push(drawEdgeWithScore(R_L4,l4Angles[1],R_L5,finalAngle, infoF1.color, infoF1.dashed, infoF1.score));
 
 function flagImg(code, cx, cy, size){
   const iso = FLAG_ISO[code];
@@ -406,31 +423,20 @@ function flagImg(code, cx, cy, size){
   return `<image href="https://flagcdn.com/w80/${iso}.png" x="${cx-r}" y="${cy-r}" width="${size}" height="${size}" preserveAspectRatio="xMidYMid slice" style="clip-path:circle(50%)" />`;
 }
 
-// Small badge showing the losing score, tucked into the corner of a node —
-// only drawn on a team's terminal (eliminated) node.
-function eliminatedBadge(cx, cy, nodeRadius, score){
-  const badgeR = Math.max(6, nodeRadius*0.5);
-  const bx = cx + nodeRadius*0.62, by = cy + nodeRadius*0.62;
-  return `<circle cx="${bx}" cy="${by}" r="${badgeR}" fill="${ELIMINATED_COLOR}" stroke="#0E241A" stroke-width="1.4"/>
-    <text x="${bx}" y="${by+badgeR*0.38}" font-size="${badgeR*1.15}" font-family="DM Mono, monospace" fill="#0E241A" text-anchor="middle" font-weight="700">${score}</text>`;
-}
-
 function drawNode(angle, radius, winnerEntry, eliminatedInfo){
     const p = polar(radius, angle);
     if(!winnerEntry) return `<circle cx="${p.x}" cy="${p.y}" r="3.4" fill="#3A5548"/>`;
-    const { team, color, score } = winnerEntry;
+    const { team, color } = winnerEntry;
     const isEliminatedHere = !!eliminatedInfo;
     const ringColor = isEliminatedHere ? ELIMINATED_COLOR : color;
     const opacity = isEliminatedHere ? 0.45 : 1;
     const lp = polar(radius + 22, angle);
     let rot = angle, anchor = 'start';
     if(angle > 90 && angle < 270){ rot = angle + 180; anchor = 'end'; }
-    const labelText = score !== undefined ? `${team.c} ${score}` : team.c;
     return `<g class="${isEliminatedHere ? '' : 'qualified'}" opacity="${opacity}">
       <circle cx="${p.x}" cy="${p.y}" r="13" fill="#0E241A" stroke="${ringColor}" stroke-width="2.5"/>
       ${flagImg(team.c, p.x, p.y, 22)}
-      ${isEliminatedHere ? eliminatedBadge(p.x, p.y, 13, eliminatedInfo.score) : ''}
-      <text x="${lp.x}" y="${lp.y}" font-size="9.5" font-family="DM Mono, monospace" fill="${ringColor}" text-anchor="${anchor}" transform="rotate(${rot} ${lp.x} ${lp.y})">${labelText}</text>
+      <text x="${lp.x}" y="${lp.y}" font-size="9.5" font-family="DM Mono, monospace" fill="${ringColor}" text-anchor="${anchor}" transform="rotate(${rot} ${lp.x} ${lp.y})">${team.c}</text>
     </g>`;
   }
 
@@ -446,7 +452,7 @@ function drawNode(angle, radius, winnerEntry, eliminatedInfo){
 
   r32.forEach((m,j)=>{
     const w = winnerOf(m);
-    [{team:m.home, angle:leafAngles[j*2], score:m.score?.[0]},{team:m.away, angle:leafAngles[j*2+1], score:m.score?.[1]}].forEach(({team,angle,score})=>{
+    [{team:m.home, angle:leafAngles[j*2]},{team:m.away, angle:leafAngles[j*2+1]}].forEach(({team,angle})=>{
       const p = polar(R_LEAF, angle);
       const elim = eliminatedMap.get(team.c);
       const isEliminatedHere = elim && elim.level === 0;
@@ -457,13 +463,11 @@ function drawNode(angle, radius, winnerEntry, eliminatedInfo){
       const lp = polar(labelR, angle);
       let rot = angle, anchor = 'start';
       if(angle > 90 && angle < 270){ rot = angle + 180; anchor='end'; }
-      const labelText = (m.status === 'final' && score !== undefined) ? `${team.c} ${score}` : team.c;
       const labelColor = isEliminatedHere ? ELIMINATED_COLOR : (isWinner?'#D4A537':'#9FB3A8');
       svgParts.push(`<g opacity="${opacity}">
         <circle cx="${p.x}" cy="${p.y}" r="16" fill="#0E241A" stroke="${ringColor}" stroke-width="2.5"/>
         ${flagImg(team.c, p.x, p.y, 28)}
-        ${isEliminatedHere ? eliminatedBadge(p.x, p.y, 16, elim.score) : ''}
-        <text x="${lp.x}" y="${lp.y}" font-size="11" font-family="DM Mono, monospace" fill="${labelColor}" text-anchor="${anchor}" transform="rotate(${rot} ${lp.x} ${lp.y})">${labelText}</text>
+        <text x="${lp.x}" y="${lp.y}" font-size="11" font-family="DM Mono, monospace" fill="${labelColor}" text-anchor="${anchor}" transform="rotate(${rot} ${lp.x} ${lp.y})">${team.c}</text>
       </g>`);
     });
   });
