@@ -278,7 +278,7 @@ function resolveNextLevel(prevWinners, groupCount, events, eliminatedMap, levelT
 // ---------- Rendering (pure function of an r32 array) ----------
 function renderWheel(r32){
   const CX = 400, CY = 400;
-  const R_LEAF = 340, R_L1 = 296, R_L2 = 248, R_L3 = 196, R_L4 = 138, R_L5 = 70;
+  const R_LEAF = 340, R_L1 = 296, R_L2 = 248, R_L3 = 196, R_L4 = 138, R_L5 = 100;
   const START_ANGLE = -90;
   const STEP = 360/32;
   const palette = ['#D4A537','#C8453C','#4A8F6B','#4C7FBF','#B8875C','#8B6FB0'];
@@ -318,9 +318,9 @@ function renderWheel(r32){
   // (their win color if they advanced, green if this is where they lost).
   function scoreBadge(rParent, aChild, score, color){
     const p = polar(rParent, aChild);
-    const r = 11;
-    return `<circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${color}" stroke="#0E241A" stroke-width="1.6"/>
-      <text x="${p.x}" y="${p.y+4}" font-size="11" font-family="DM Mono, monospace" fill="#0E241A" text-anchor="middle" font-weight="700">${score}</text>`;
+    const r = 5.5;
+    return `<circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${color}" stroke="#0E241A" stroke-width="1"/>
+      <text x="${p.x}" y="${p.y+2.3}" font-size="6" font-family="DM Mono, monospace" fill="#0E241A" text-anchor="middle" font-weight="700">${score}</text>`;
   }
 
   function drawEdgeWithScore(rChild, aChild, rParent, aParent, color, dashed, score){
@@ -359,6 +359,18 @@ function renderWheel(r32){
   const level3Winners = resolveNextLevel(level2Winners, 4, lastEvents, eliminatedMap, 2);
   const level4Winners = resolveNextLevel(level3Winners, 2, lastEvents, eliminatedMap, 3);
   const champion = resolveNextLevel(level4Winners, 1, lastEvents, eliminatedMap, 4)[0]; // null until the Final is decided
+
+  // A team's flag should only appear at its CURRENT position — everywhere
+  // it passed through earlier becomes a small dot instead, so the flag
+  // visually "travels" forward rather than being repeated at every stage.
+  function computeLatestLevel(code){
+    if(champion && champion.team.c === code) return 5;
+    if(level4Winners.some(e => e && e.team.c === code)) return 4;
+    if(level3Winners.some(e => e && e.team.c === code)) return 3;
+    if(level2Winners.some(e => e && e.team.c === code)) return 2;
+    if(level1Winners.some(e => e && e.team.c === code)) return 1;
+    return 0;
+  }
 
   // R32 leaves -> R16 nodes. A confirmed loss (level 0) renders green+dashed
   // with the losing score badged on the path; an active win stays solid in
@@ -417,18 +429,32 @@ function renderWheel(r32){
   svgParts.push(drawEdgeWithScore(R_L4,l4Angles[0],R_L5,finalAngle, infoF0.color, infoF0.dashed, infoF0.score));
   svgParts.push(drawEdgeWithScore(R_L4,l4Angles[1],R_L5,finalAngle, infoF1.color, infoF1.dashed, infoF1.score));
 
+  // A clear stopping point for the Final — the flag itself moves on to the
+  // champion display at center, so this is just a dot, not a repeated flag.
+  {
+    const fp = polar(R_L5, finalAngle);
+    const dotColor = champion ? champion.color : '#3A5548';
+    svgParts.push(`<circle cx="${fp.x}" cy="${fp.y}" r="5" fill="${dotColor}" stroke="#0E241A" stroke-width="1"/>`);
+  }
+
 function flagImg(code, cx, cy, size){
   const iso = FLAG_ISO[code];
   const r = size/2;
   return `<image href="https://flagcdn.com/w80/${iso}.png" x="${cx-r}" y="${cy-r}" width="${size}" height="${size}" preserveAspectRatio="xMidYMid slice" style="clip-path:circle(50%)" />`;
 }
 
-function drawNode(angle, radius, winnerEntry, eliminatedInfo){
+function drawNode(angle, radius, winnerEntry, eliminatedInfo, isLatest){
     const p = polar(radius, angle);
     if(!winnerEntry) return `<circle cx="${p.x}" cy="${p.y}" r="3.4" fill="#3A5548"/>`;
     const { team, color } = winnerEntry;
     const isEliminatedHere = !!eliminatedInfo;
     const ringColor = isEliminatedHere ? ELIMINATED_COLOR : color;
+
+    if(!isLatest){
+      // Already moved on from here — just a small marker, not a repeated flag.
+      return `<circle cx="${p.x}" cy="${p.y}" r="5" fill="${color}" stroke="#0E241A" stroke-width="1"/>`;
+    }
+
     const opacity = isEliminatedHere ? 0.45 : 1;
     const lp = polar(radius + 22, angle);
     let rot = angle, anchor = 'start';
@@ -445,10 +471,10 @@ function drawNode(angle, radius, winnerEntry, eliminatedInfo){
     const elim = eliminatedMap.get(entry.team.c);
     return (elim && elim.level === level) ? elim : null;
   }
-  l1Angles.forEach((a,j)=> svgParts.push(drawNode(a, R_L1, level1Winners[j], terminalInfo(level1Winners[j], 1))) );
-  l2Angles.forEach((a,k)=> svgParts.push(drawNode(a, R_L2, level2Winners[k], terminalInfo(level2Winners[k], 2))) );
-  l3Angles.forEach((a,m)=> svgParts.push(drawNode(a, R_L3, level3Winners[m], terminalInfo(level3Winners[m], 3))) );
-  l4Angles.forEach((a,n)=> svgParts.push(drawNode(a, R_L4, level4Winners[n], terminalInfo(level4Winners[n], 4))) );
+  l1Angles.forEach((a,j)=> { const e=level1Winners[j]; svgParts.push(drawNode(a, R_L1, e, terminalInfo(e,1), e && computeLatestLevel(e.team.c)===1)); });
+  l2Angles.forEach((a,k)=> { const e=level2Winners[k]; svgParts.push(drawNode(a, R_L2, e, terminalInfo(e,2), e && computeLatestLevel(e.team.c)===2)); });
+  l3Angles.forEach((a,m)=> { const e=level3Winners[m]; svgParts.push(drawNode(a, R_L3, e, terminalInfo(e,3), e && computeLatestLevel(e.team.c)===3)); });
+  l4Angles.forEach((a,n)=> { const e=level4Winners[n]; svgParts.push(drawNode(a, R_L4, e, terminalInfo(e,4), e && computeLatestLevel(e.team.c)===4)); });
 
   r32.forEach((m,j)=>{
     const w = winnerOf(m);
@@ -458,6 +484,13 @@ function drawNode(angle, radius, winnerEntry, eliminatedInfo){
       const isEliminatedHere = elim && elim.level === 0;
       const isWinner = w && team===w;
       const ringColor = isEliminatedHere ? ELIMINATED_COLOR : (isWinner ? palette[j % palette.length] : '#6E8577');
+
+      if(isWinner && computeLatestLevel(team.c) > 0){
+        // They've moved on to a later round — leave a small dot here instead of repeating the flag.
+        svgParts.push(`<circle cx="${p.x}" cy="${p.y}" r="5" fill="${palette[j % palette.length]}" stroke="#0E241A" stroke-width="1"/>`);
+        return;
+      }
+
       const opacity = isEliminatedHere ? 0.45 : 1;
       const labelR = R_LEAF + 34;
       const lp = polar(labelR, angle);
