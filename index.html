@@ -26,29 +26,25 @@
     padding: 18px 0 40px;
   }
   header{
-    padding: 0 16px 14px;
+    padding: 62px 16px 14px;
     text-align:center;
   }
-  .header-top{
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    position:relative;
-    margin-bottom:4px;
-  }
   #viewerBadge{
-    position:absolute;
-    left:0;
+    position:fixed;
+    top:30px;
+    left:12px;
+    z-index:30;
     display:flex;
     align-items:center;
     gap:5px;
-    background:transparent;
+    background:rgba(11,31,23,0.9);
     border:1px solid var(--gold);
     border-radius:16px;
     padding:4px 12px;
     font-family:'DM Mono', monospace;
     font-size:11px;
     color: var(--gold);
+    backdrop-filter: blur(3px);
   }
   .eyebrow{
     font-family:'DM Mono', monospace;
@@ -56,6 +52,7 @@
     letter-spacing:0.2em;
     text-transform:uppercase;
     color: var(--gold);
+    margin-bottom:4px;
   }
   h1{ font-size:22px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; }
   .sub{ font-family:'DM Mono', monospace; font-size:10.5px; color:var(--muted); margin-top:6px; }
@@ -140,19 +137,34 @@
     white-space: nowrap;
   }
   .upcoming-more-btn{
-    display:block;
-    margin: 4px auto 0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:9px;
+    margin: 14px auto 0;
     font-family:'DM Mono', monospace;
-    font-size: 10.5px;
-    letter-spacing: 0.08em;
+    font-size: 14px;
+    font-weight:700;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: #4CAF7D;
-    background: transparent;
-    border: 1px solid #4CAF7D;
-    border-radius: 20px;
-    padding: 6px 18px;
+    color: #8FD9B0;
+    background: #143C2C;
+    border: 2px solid #3FA26B;
+    border-radius: 32px;
+    padding: 15px 34px;
     cursor: pointer;
+    transition: transform 0.15s ease;
   }
+  .upcoming-more-btn:active{ transform: scale(0.96); }
+  .upcoming-more-btn .chevron{ transition: transform 0.25s ease; }
+  .upcoming-more-btn.expanded .chevron{ transform: rotate(180deg); }
+  #upcomingRest{
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transition: max-height 0.38s ease, opacity 0.3s ease;
+  }
+  #upcomingRest.expanded{ opacity: 1; }
 
   footer{
     margin: 22px 20px 0;
@@ -168,13 +180,12 @@
 </head>
 <body>
 
+<div id="viewerBadge">
+  <span aria-hidden="true">👁</span><span id="viewerCount">–</span>
+</div>
+
 <header>
-  <div class="header-top">
-    <div id="viewerBadge">
-      <span aria-hidden="true">👁</span><span id="viewerCount">–</span>
-    </div>
-    <div class="eyebrow">FIFA World Cup 2026 · Knockout Wheel</div>
-  </div>
+  <div class="eyebrow">FIFA World Cup 2026 · Knockout Wheel</div>
   <h1>Winners Tracker</h1>
   <div class="sub" id="syncStatus">Loading…</div>
 </header>
@@ -194,10 +205,13 @@
   <div id="upcomingList"></div>
 </div>
 
-<div style="text-align:center; margin-top:10px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+<div style="text-align:center; margin-top:20px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
   <button id="syncBtn" style="font-family:'DM Mono',monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:#D4A537; background:transparent; border:1px solid #3A5548; border-radius:20px; padding:7px 16px; cursor:pointer;">↻ Sync now</button>
   <button id="notifyBtn" style="font-family:'DM Mono',monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:#D4A537; background:transparent; border:1px solid #3A5548; border-radius:20px; padding:7px 16px; cursor:pointer;">🔔 Enable notifications</button>
   <button id="testNotifyBtn" style="font-family:'DM Mono',monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:#D4A537; background:transparent; border:1px solid #3A5548; border-radius:20px; padding:7px 16px; cursor:pointer;">📨 Send test</button>
+</div>
+<div style="text-align:center; margin-top:6px; font-family:'DM Mono',monospace; font-size:9px; color:#4E6459; max-width:340px; margin-left:auto; margin-right:auto;">
+  🔔 Notifications only say a match has ended — no score or winner included, so you'll need to open the app to see the result.
 </div>
 <div id="notifyStatus" style="text-align:center; margin-top:8px; font-family:'DM Mono',monospace; font-size:9.5px; color:#4E6459;"></div>
 
@@ -677,20 +691,32 @@ function renderUpcoming(events){
   const VISIBLE_DEFAULT = 3;
   const rowsHTML = upcoming.map(rowHTML).join('');
   const hasMore = upcoming.length > VISIBLE_DEFAULT;
+  const chevronSVG = `<svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
 
   container.innerHTML = `
     <div id="upcomingVisible">${upcoming.slice(0, VISIBLE_DEFAULT).map(rowHTML).join('')}</div>
-    <div id="upcomingRest" style="display:none;">${upcoming.slice(VISIBLE_DEFAULT).map(rowHTML).join('')}</div>
-    ${hasMore ? `<button id="upcomingMoreBtn" class="upcoming-more-btn">⌄ Show more</button>` : ''}
+    <div id="upcomingRest">${upcoming.slice(VISIBLE_DEFAULT).map(rowHTML).join('')}</div>
+    ${hasMore ? `<button id="upcomingMoreBtn" class="upcoming-more-btn">${chevronSVG}<span id="upcomingMoreLabel">Show more</span></button>` : ''}
   `;
 
   if(hasMore){
     document.getElementById('upcomingMoreBtn').addEventListener('click', () => {
       const rest = document.getElementById('upcomingRest');
       const btn = document.getElementById('upcomingMoreBtn');
-      const expanded = rest.style.display !== 'none';
-      rest.style.display = expanded ? 'none' : 'block';
-      btn.textContent = expanded ? '⌄ Show more' : '⌃ Show less';
+      const label = document.getElementById('upcomingMoreLabel');
+      const expanded = rest.classList.contains('expanded');
+      if(expanded){
+        rest.style.maxHeight = rest.scrollHeight + 'px'; // pin current height first
+        requestAnimationFrame(() => { rest.style.maxHeight = '0px'; });
+        rest.classList.remove('expanded');
+        btn.classList.remove('expanded');
+        label.textContent = 'Show more';
+      } else {
+        rest.classList.add('expanded');
+        rest.style.maxHeight = rest.scrollHeight + 'px';
+        btn.classList.add('expanded');
+        label.textContent = 'Show less';
+      }
     });
   }
 }
@@ -816,7 +842,7 @@ async function toggleNotifications(){
       }catch(e){}
       throw new Error(`Server rejected the subscription — status ${res.status}${detail}`);
     }
-    setNotifyStatus('You\'ll get a notification whenever a match finishes.');
+    setNotifyStatus('You\'ll get notified when a match ends — no score or winner included.');
   }catch(e){
     setNotifyStatus('Subscribe failed: ' + e.message);
     // Roll back the client-side subscription since the server never saved it —

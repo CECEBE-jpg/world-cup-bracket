@@ -9,7 +9,8 @@ function describeMatch(ev) {
   const away = comp.competitors.find(c => c.homeAway === 'away');
   return {
     id: ev.id,
-    text: `${home.team.abbreviation} ${home.score} – ${away.score} ${away.team.abbreviation}`,
+    // Deliberately no score or winner here — open the app to see the result.
+    text: `${home.team.abbreviation} vs ${away.team.abbreviation} has ended. Open the app to see who won!`,
   };
 }
 
