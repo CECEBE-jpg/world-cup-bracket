@@ -1,64 +1,57 @@
 const { getBlobStore } = require('./lib/blobStore');
-const crypto = require('crypto');
-
-function keyFor(subscription) {
-  return crypto.createHash('sha256').update(subscription.endpoint).digest('hex');
-}
 
 const headers = {
   'Content-Type': 'application/json',
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, DELETE, OPTIONS',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
+// A device counts as "currently watching" if its last heartbeat was within this window.
+const ACTIVE_WINDOW_MS = 60 * 1000;
+// Entries older than this are just deleted outright to keep the store tidy.
+const STALE_CLEANUP_MS = ACTIVE_WINDOW_MS * 10;
+
 exports.handler = async function (event) {
   try {
-    if (event.httpMethod === 'OPTIONS') {
-      return { statusCode: 204, headers };
-    }
-
-    if (event.httpMethod !== 'POST' && event.httpMethod !== 'DELETE') {
+    if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers };
+    if (event.httpMethod !== 'POST') {
       return { statusCode: 405, headers, body: JSON.stringify({ error: 'method not allowed' }) };
     }
-
     if (!process.env.NETLIFY_SITE_ID || !process.env.NETLIFY_AUTH_TOKEN) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ error: 'NETLIFY_SITE_ID / NETLIFY_AUTH_TOKEN environment variables are not set' }),
-      };
+      return { statusCode: 500, headers, body: JSON.stringify({ error: 'NETLIFY_SITE_ID / NETLIFY_AUTH_TOKEN not set' }) };
     }
 
     let body;
-    try {
-      body = JSON.parse(event.body || '{}');
-    } catch (e) {
+    try { body = JSON.parse(event.body || '{}'); } catch (e) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'invalid JSON body' }) };
     }
-
-    const subscription = body.subscription;
-    if (!subscription || !subscription.endpoint) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'missing subscription.endpoint' }) };
+    const clientId = body.clientId;
+    if (!clientId) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'missing clientId' }) };
     }
 
-    const store = getBlobStore('push-subscriptions');
+    const store = getBlobStore('presence');
+    const now = Date.now();
+    await store.setJSON(clientId, { lastSeen: now });
 
-    if (event.httpMethod === 'POST') {
-      await store.setJSON(keyFor(subscription), subscription);
-      return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
-    }
+    const { blobs } = await store.list();
+    let count = 0;
+    await Promise.all(blobs.map(async (b) => {
+      const entry = await store.get(b.key, { type: 'json' });
+      if (!entry) return;
+      const age = now - entry.lastSeen;
+      if (age <= ACTIVE_WINDOW_MS) {
+        count++;
+      } else if (age > STALE_CLEANUP_MS) {
+        await store.delete(b.key);
+      }
+    }));
 
-    // DELETE
-    await store.delete(keyFor(subscription));
-    return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
+    return { statusCode: 200, headers, body: JSON.stringify({ count }) };
 
   } catch (e) {
-    console.error('subscribe function error:', e);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: 'internal error', detail: String(e && e.message || e) }),
-    };
+    console.error('presence function error:', e);
+    return { statusCode: 500, headers, body: JSON.stringify({ error: String(e && e.message || e) }) };
   }
 };
