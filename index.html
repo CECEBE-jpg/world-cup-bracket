@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>World Cup 2026 — Winners Tracker</title>
 <link rel="manifest" href="/manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -61,12 +61,28 @@
     max-width: 760px;
     margin: 10px auto 0;
     padding: 0 6px;
+    touch-action: none;
+    overflow: visible;
   }
-  svg{ width:100%; height:auto; display:block; }
+  svg{ width:100%; height:auto; display:block; transform-origin: 50% 50%; will-change: transform; }
   .qualified circle{ animation: pulse 2.4s ease-in-out infinite; }
   @keyframes pulse{
     0%,100%{ filter: drop-shadow(0 0 0 rgba(212,165,55,0)); }
     50%{ filter: drop-shadow(0 0 4px rgba(212,165,55,0.65)); }
+  }
+  .recently-advanced{
+    animation: recentGlowPulse 3.2s ease-in-out infinite;
+  }
+  @keyframes recentGlowPulse{
+    0%,100%{ filter: drop-shadow(0 0 3px #FFE8A3) drop-shadow(0 0 1px #FFE8A3); }
+    50%{ filter: drop-shadow(0 0 12px #FFE8A3) drop-shadow(0 0 5px #FFE8A3); }
+  }
+  .travel-in{
+    animation: travelIn 1.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @keyframes travelIn{
+    from{ transform: translate(var(--tx, 0px), var(--ty, 0px)); }
+    to{ transform: translate(0, 0); }
   }
 
   .legend{
@@ -116,6 +132,150 @@
     margin: 0 auto 16px;
     line-height: 1.5;
   }
+  .match-tap{ cursor: pointer; }
+  .match-overlay{
+    position: fixed;
+    inset: 0;
+    background: rgba(3,10,7,0.75);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    padding: 20px;
+  }
+  .match-overlay.open{ opacity: 1; pointer-events: auto; }
+  .match-popup{
+    background: linear-gradient(160deg, #16332a, #0B1F17);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 22px 20px;
+    max-width: 320px;
+    width: 100%;
+    text-align: center;
+    position: relative;
+  }
+  .match-popup-close{
+    position: absolute;
+    top: 10px; right: 10px;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px 8px;
+  }
+  .match-popup-round{
+    font-family:'DM Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 14px;
+  }
+  .match-popup-teams{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-family:'Oswald', sans-serif;
+    font-size: 14px;
+    text-transform: uppercase;
+    font-weight: 600;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .match-popup-teams img{ width:26px; height:26px; border-radius:50%; box-shadow:0 0 0 1px #3A5548; }
+  .match-popup-vs{ color: var(--muted); font-size: 11px; text-transform: none; font-weight: 400; margin: 0 2px; }
+  .match-popup-score{
+    font-family:'DM Mono', monospace;
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+  .match-popup-pk{
+    font-family:'DM Mono', monospace;
+    font-size: 10.5px;
+    color: var(--red);
+    margin-bottom: 10px;
+  }
+  .match-popup-meta{
+    font-family:'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .match-popup-goals{
+    text-align: left;
+    margin-top: 12px;
+  }
+  .match-popup-goals-title{
+    font-family:'DM Mono', monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gold);
+    border-top: 1px solid var(--line);
+    padding-top: 10px;
+    margin-bottom: 6px;
+  }
+  .match-popup-goal-row{
+    display:flex;
+    align-items:center;
+    justify-content: space-between;
+    gap: 8px;
+    font-family:'Oswald', sans-serif;
+    font-size: 12px;
+    padding: 4px 0;
+  }
+  .match-popup-goal-min{
+    font-family:'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    min-width: 28px;
+  }
+  .match-popup-goal-player{ flex:1; text-align:left; }
+  .match-popup-goal-team{
+    font-family:'DM Mono', monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .predict-bar{
+    height: 10px;
+    border-radius: 5px;
+    overflow: hidden;
+    display:flex;
+    background: var(--line);
+    margin: 14px 0 8px;
+  }
+  .predict-bar div{ height:100%; }
+  .predict-labels{
+    display:flex;
+    justify-content: space-between;
+    font-family:'DM Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .predict-labels b{ color: var(--ink); font-weight:600; }
+  .predict-source{
+    font-family:'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    margin-top: 10px;
+  }
+  .predict-unavailable{
+    font-family:'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    padding: 10px 0 4px;
+    line-height:1.5;
+  }
   .upcoming-empty{
     font-family:'DM Mono', monospace;
     font-size: 11px;
@@ -133,6 +293,7 @@
     border-radius: 14px;
     padding: 10px 16px;
     margin-bottom: 8px;
+    cursor: pointer;
   }
   .upcoming-teams{
     display:flex;
@@ -214,6 +375,27 @@
   <svg id="wheel" viewBox="-30 -30 860 860" xmlns="http://www.w3.org/2000/svg"></svg>
 </div>
 
+<div id="matchOverlay" class="match-overlay">
+  <div class="match-popup">
+    <button id="matchPopupClose" class="match-popup-close" aria-label="Close">✕</button>
+    <div id="matchPopupRound" class="match-popup-round"></div>
+    <div id="matchPopupTeams" class="match-popup-teams"></div>
+    <div id="matchPopupScore" class="match-popup-score"></div>
+    <div id="matchPopupPk"></div>
+    <div id="matchPopupMeta" class="match-popup-meta"></div>
+    <div id="matchPopupGoals" class="match-popup-goals"></div>
+  </div>
+</div>
+
+<div id="predictOverlay" class="match-overlay">
+  <div class="match-popup">
+    <button id="predictPopupClose" class="match-popup-close" aria-label="Close">✕</button>
+    <div class="match-popup-round">Prediction</div>
+    <div id="predictPopupTeams" class="match-popup-teams"></div>
+    <div id="predictPopupBody"></div>
+  </div>
+</div>
+
 <div class="legend">
   <span><i style="background:#D4A537"></i> Qualified — flag moved up</span>
   <span><i style="background:#3F9E6B"></i> Eliminated</span>
@@ -286,6 +468,14 @@ const CACHE_KEY = 'wc2026-bracket-cache-v1';
 // compute them from R32 winners, so they can't be hardcoded like R32 can.
 let lastEvents = [];
 
+// Tracks each team's furthest-reached level, and which teams are currently
+// glowing. The glow persists across any number of no-op syncs and only
+// changes — clearing the old glow, lighting up the new team(s) — when a
+// sync actually produces a genuinely new result, not just on every render.
+let previousLatestLevels = null;
+let glowingTeams = new Set();
+let animatedThisSession = new Set(); // teams whose slide-in animation has already played once
+
 function winnerOf(m){
   if(m.status !== 'final') return null;
   if(m.winnerSide) return m.winnerSide === 'home' ? m.home : m.away;
@@ -296,6 +486,65 @@ function winnerOf(m){
 // Looks through live events for a match between two specific team codes,
 // regardless of which round it belongs to. Used to resolve R16/QF/SF/Final
 // once we know who's actually playing, since that's only knowable at runtime.
+// Converts American moneyline odds to an implied probability (0-1).
+function americanToImplied(odds){
+  const n = Number(odds);
+  if(Number.isNaN(n)) return null;
+  return n > 0 ? 100/(n+100) : (-n)/((-n)+100);
+}
+
+// ESPN's scoreboard already embeds real sportsbook odds per match (moneyline,
+// spread, totals) — no extra API call needed. This turns that into a
+// Google-style win/draw/win probability breakdown, normalized to 100%.
+function getOddsInfo(ev){
+  const comp = ev?.competitions?.[0];
+  const odds = comp?.odds?.[0];
+  const ml = odds?.moneyline;
+  if(!ml || !ml.home || !ml.away) return null;
+  const homeOdds = ml.home.close?.odds ?? ml.home.open?.odds;
+  const awayOdds = ml.away.close?.odds ?? ml.away.open?.odds;
+  const drawOdds = ml.draw?.close?.odds ?? ml.draw?.open?.odds;
+  const hImp = americanToImplied(homeOdds);
+  const aImp = americanToImplied(awayOdds);
+  const dImp = drawOdds !== undefined ? americanToImplied(drawOdds) : null;
+  if(hImp === null || aImp === null) return null;
+  const total = hImp + aImp + (dImp || 0);
+  return {
+    home: Math.round((hImp/total)*1000)/10,
+    away: Math.round((aImp/total)*1000)/10,
+    draw: dImp !== null ? Math.round((dImp/total)*1000)/10 : null,
+    provider: odds.provider?.displayName || odds.provider?.name || 'Sportsbook',
+    overUnder: odds.overUnder ?? null,
+  };
+}
+
+// Pulls the scoring plays out of ESPN's match detail feed — player name,
+// minute, and goal type (header/volley/penalty/own goal) — already included
+// in the same scoreboard call, no extra API needed.
+function extractGoalEvents(ev, codeA, codeB){
+  const comp = ev?.competitions?.[0];
+  const details = comp?.details;
+  if(!details || !details.length) return [];
+  const compA = comp.competitors.find(c => teamMatches(codeA, c.team));
+  const compB = comp.competitors.find(c => teamMatches(codeB, c.team));
+  if(!compA || !compB) return [];
+  return details.filter(d => d.scoringPlay).map(d => {
+    const isA = d.team?.id === compA.team.id;
+    const scorer = d.athletesInvolved?.[0];
+    let type = 'Goal';
+    if(d.ownGoal) type = 'Own Goal';
+    else if(d.penaltyKick) type = 'Penalty';
+    else if(/header/i.test(d.type?.text || '')) type = 'Header';
+    else if(/volley/i.test(d.type?.text || '')) type = 'Volley';
+    return {
+      minute: d.clock?.displayValue || '',
+      player: scorer?.displayName || 'Unknown',
+      type,
+      teamCode: isA ? codeA : codeB,
+    };
+  });
+}
+
 function findMatchResult(events, codeA, codeB){
   if(!codeA || !codeB) return null;
   const ev = (events || []).find(e => {
@@ -313,15 +562,22 @@ function findMatchResult(events, codeA, codeB){
   if(!compA || !compB) return null;
   const scoreA = Number(compA.score), scoreB = Number(compB.score);
   let winnerCode = null;
+  let decidedOnPk = false;
   if(completed){
     if(scoreA === scoreB){
-      if(compA.winner) winnerCode = codeA;
-      else if(compB.winner) winnerCode = codeB;
+      if(compA.winner){ winnerCode = codeA; decidedOnPk = true; }
+      else if(compB.winner){ winnerCode = codeB; decidedOnPk = true; }
     } else {
       winnerCode = scoreA > scoreB ? codeA : codeB;
     }
   }
-  return { completed, scoreA, scoreB, winnerCode };
+  return {
+    completed, scoreA, scoreB, winnerCode, decidedOnPk,
+    date: ev.date || null,
+    venue: comp.venue?.fullName || null,
+    city: comp.venue?.address?.city || null,
+    goals: extractGoalEvents(ev, codeA, codeB),
+  };
 }
 
 // Given one round's resolved winners, finds each pair's live result (if any)
@@ -329,7 +585,7 @@ function findMatchResult(events, codeA, codeB){
 // drawNode() and the rest of the rendering code work unchanged for every round.
 // Also records the losing side into eliminatedMap, tagged with levelTag so
 // the renderer knows exactly which node is that team's terminal (final) one.
-function resolveNextLevel(prevWinners, groupCount, events, eliminatedMap, levelTag){
+function resolveNextLevel(prevWinners, groupCount, events, eliminatedMap, levelTag, roundName){
   const result = [];
   for(let i=0;i<groupCount;i++){
     const a = prevWinners[i*2];
@@ -341,7 +597,15 @@ function resolveNextLevel(prevWinners, groupCount, events, eliminatedMap, levelT
       const loserEntry  = res.winnerCode === a.team.c ? b : a;
       const winnerScore = res.winnerCode === a.team.c ? res.scoreA : res.scoreB;
       const loserScore  = res.winnerCode === a.team.c ? res.scoreB : res.scoreA;
-      result.push({ team: winnerEntry.team, color: winnerEntry.color, score: winnerScore });
+      result.push({
+        team: winnerEntry.team, color: winnerEntry.color, score: winnerScore,
+        matchInfo: {
+          round: roundName,
+          opponent: loserEntry.team, ownScore: winnerScore, opponentScore: loserScore,
+          decidedOnPk: res.decidedOnPk, date: res.date, venue: res.venue, city: res.city,
+          goals: res.goals || [],
+        },
+      });
       if(eliminatedMap && levelTag !== undefined){
         eliminatedMap.set(loserEntry.team.c, { score: loserScore, level: levelTag });
       }
@@ -358,7 +622,7 @@ function renderWheel(r32){
   const R_LEAF = 340, R_L1 = 296, R_L2 = 248, R_L3 = 196, R_L4 = 138, R_L5 = 100;
   const START_ANGLE = -90;
   const STEP = 360/32;
-  const palette = ['#D4A537','#C8453C','#4A8F6B','#4C7FBF','#B8875C','#8B6FB0'];
+  const WIN_COLOR = '#D4A537'; // every winning path/flag uses this same yellow/gold, no per-match variation
 
   function polar(r, angleDeg){
     const rad = angleDeg * Math.PI/180;
@@ -407,7 +671,7 @@ function renderWheel(r32){
   }
 
   // A dedicated color for "confirmed eliminated", distinct from the neutral
-  // grey used for "not yet decided" and from the active win-path palette.
+  // grey used for "not yet decided" and from the yellow used for winners.
   const ELIMINATED_COLOR = '#3F9E6B';
 
   // Tracks each eliminated team's terminal node — the one place their run
@@ -430,12 +694,22 @@ function renderWheel(r32){
     const w = winnerOf(m);
     if(!w) return null;
     const score = w === m.home ? m.score?.[0] : m.score?.[1];
-    return { team:w, color: palette[j % palette.length], score };
+    const opponent = w === m.home ? m.away : m.home;
+    const opponentScore = w === m.home ? m.score?.[1] : m.score?.[0];
+    const liveResult = findMatchResult(lastEvents, m.home.c, m.away.c);
+    return {
+      team:w, color: WIN_COLOR, score,
+      matchInfo: {
+        round: 'Round of 32', opponent, ownScore: score, opponentScore, decidedOnPk: !!m.pk,
+        date: liveResult?.date || null, venue: liveResult?.venue || null, city: liveResult?.city || null,
+        goals: liveResult?.goals || [],
+      },
+    };
   });
-  const level2Winners = resolveNextLevel(level1Winners, 8, lastEvents, eliminatedMap, 1);
-  const level3Winners = resolveNextLevel(level2Winners, 4, lastEvents, eliminatedMap, 2);
-  const level4Winners = resolveNextLevel(level3Winners, 2, lastEvents, eliminatedMap, 3);
-  const champion = resolveNextLevel(level4Winners, 1, lastEvents, eliminatedMap, 4)[0]; // null until the Final is decided
+  const level2Winners = resolveNextLevel(level1Winners, 8, lastEvents, eliminatedMap, 1, 'Round of 16');
+  const level3Winners = resolveNextLevel(level2Winners, 4, lastEvents, eliminatedMap, 2, 'Quarterfinal');
+  const level4Winners = resolveNextLevel(level3Winners, 2, lastEvents, eliminatedMap, 3, 'Semifinal');
+  const champion = resolveNextLevel(level4Winners, 1, lastEvents, eliminatedMap, 4, 'Final')[0]; // null until the Final is decided
 
   // A team's flag should only appear at its CURRENT position — everywhere
   // it passed through earlier becomes a small dot instead, so the flag
@@ -449,12 +723,63 @@ function renderWheel(r32){
     return 0;
   }
 
+  // Detects teams that moved further along their path since the last CONFIRMED
+  // update (not just the last render — a no-op sync shouldn't clear the glow).
+  // Skipped on the very first render — nothing has "recently" happened yet.
+  const LEVEL_RADII = [R_LEAF, R_L1, R_L2, R_L3, R_L4];
+  function findSlotAngle(levelNum, code){
+    if(levelNum === 0){
+      for(let j=0;j<r32.length;j++){
+        if(r32[j].home.c === code) return leafAngles[j*2];
+        if(r32[j].away.c === code) return leafAngles[j*2+1];
+      }
+      return null;
+    }
+    const arr = [null, level1Winners, level2Winners, level3Winners, level4Winners][levelNum];
+    const angleArr = [null, l1Angles, l2Angles, l3Angles, l4Angles][levelNum];
+    if(!arr) return null;
+    const idx = arr.findIndex(e => e && e.team.c === code);
+    return idx >= 0 ? angleArr[idx] : null;
+  }
+
+  const newLevels = {};
+  r32.forEach(m => { newLevels[m.home.c] = computeLatestLevel(m.home.c); newLevels[m.away.c] = computeLatestLevel(m.away.c); });
+  const travelOffsets = {}; // code -> {dx, dy} — where their flag should slide in from
+  if(previousLatestLevels){
+    const delta = new Set();
+    Object.keys(newLevels).forEach(code => {
+      const prev = previousLatestLevels[code] ?? 0;
+      if(newLevels[code] > prev) delta.add(code);
+    });
+    if(delta.size > 0){
+      // A real update happened — the new glow replaces whatever was glowing before.
+      // Each newly-advanced team gets a one-time slide-in animation from its old spot.
+      delta.forEach(code => {
+        if(animatedThisSession.has(code)) return; // already played once this session
+        const prevLevel = previousLatestLevels[code] ?? 0;
+        const newLevel = newLevels[code];
+        const prevAngle = findSlotAngle(prevLevel, code);
+        const newAngle = findSlotAngle(newLevel, code);
+        if(prevAngle == null || newAngle == null) return;
+        const oldPos = polar(LEVEL_RADII[prevLevel], prevAngle);
+        const newPos = polar(LEVEL_RADII[newLevel], newAngle);
+        travelOffsets[code] = { dx: oldPos.x - newPos.x, dy: oldPos.y - newPos.y };
+        animatedThisSession.add(code);
+      });
+      glowingTeams = delta;
+      previousLatestLevels = newLevels;
+    }
+    // else: nothing changed this cycle — leave glowingTeams and the baseline as they were.
+  } else {
+    previousLatestLevels = newLevels;
+  }
+
   // R32 leaves -> R16 nodes. A confirmed loss (level 0) renders green+dashed
   // with the losing score badged on the path; an active win stays solid in
   // that match's color with the winning score badged the same way.
   r32.forEach((m,j)=>{
     const w = winnerOf(m);
-    const color = palette[j % palette.length];
+    const color = WIN_COLOR;
     const aHome = leafAngles[j*2], aAway = leafAngles[j*2+1];
     function leafEdgeInfo(team, ownScore){
       const elim = eliminatedMap.get(team.c);
@@ -524,10 +849,24 @@ function flagImg(code, cx, cy, size){
   return `<image href="https://flagcdn.com/w80/${iso}.png" x="${cx-r}" y="${cy-r}" width="${size}" height="${size}" preserveAspectRatio="xMidYMid slice" style="clip-path:circle(50%)" />`;
 }
 
-function drawNode(angle, radius, winnerEntry, eliminatedInfo, isLatest){
+// Packs a match's details into an HTML-attribute-safe string for the popup to read on tap.
+function matchDataAttr(team, info){
+  if(!info || !info.opponent) return '';
+  const payload = {
+    round: info.round,
+    teamCode: team.c, teamName: team.n,
+    oppCode: info.opponent.c, oppName: info.opponent.n,
+    ownScore: info.ownScore, oppScore: info.opponentScore,
+    pk: !!info.decidedOnPk, date: info.date, venue: info.venue, city: info.city,
+    goals: info.goals || [],
+  };
+  return `data-match="${encodeURIComponent(JSON.stringify(payload))}"`;
+}
+
+function drawNode(angle, radius, winnerEntry, eliminatedInfo, isLatest, recentlyGlow, travelOffset){
     const p = polar(radius, angle);
     if(!winnerEntry) return `<circle cx="${p.x}" cy="${p.y}" r="3.4" fill="#3A5548"/>`;
-    const { team, color } = winnerEntry;
+    const { team, color, matchInfo } = winnerEntry;
     const isEliminatedHere = !!eliminatedInfo;
     const ringColor = isEliminatedHere ? ELIMINATED_COLOR : color;
 
@@ -540,13 +879,19 @@ function drawNode(angle, radius, winnerEntry, eliminatedInfo, isLatest){
     const lp = polar(radius + 22, angle);
     let rot = angle, anchor = 'start';
     if(angle > 90 && angle < 270){ rot = angle + 180; anchor = 'end'; }
+    const attr = matchInfo ? matchDataAttr(team, matchInfo) : '';
+    const glowClass = recentlyGlow ? ' recently-advanced' : '';
+    const travelClass = travelOffset ? ' travel-in' : '';
+    const travelStyle = travelOffset ? ` style="--tx:${travelOffset.dx}px; --ty:${travelOffset.dy}px;"` : '';
     // The background disc is always fully opaque — drawn outside the
     // translucent group — so no path can ever show through a dimmed flag.
-    return `<circle cx="${p.x}" cy="${p.y}" r="13" fill="#0E241A"/>
-    <g class="${isEliminatedHere ? '' : 'qualified'}" opacity="${opacity}">
-      <circle cx="${p.x}" cy="${p.y}" r="13" fill="none" stroke="${ringColor}" stroke-width="2.5"/>
-      ${flagImg(team.c, p.x, p.y, 22)}
-      <text x="${lp.x}" y="${lp.y}" font-size="9.5" font-family="DM Mono, monospace" fill="${ringColor}" text-anchor="${anchor}" transform="rotate(${rot} ${lp.x} ${lp.y})">${team.c}</text>
+    return `<g class="match-tap${glowClass}${travelClass}"${travelStyle} ${attr}>
+      <circle cx="${p.x}" cy="${p.y}" r="13" fill="#0E241A"/>
+      <g class="${isEliminatedHere ? '' : 'qualified'}" opacity="${opacity}">
+        <circle cx="${p.x}" cy="${p.y}" r="13" fill="none" stroke="${ringColor}" stroke-width="2.5"/>
+        ${flagImg(team.c, p.x, p.y, 22)}
+        <text x="${lp.x}" y="${lp.y}" font-size="9.5" font-family="DM Mono, monospace" fill="${ringColor}" text-anchor="${anchor}" transform="rotate(${rot} ${lp.x} ${lp.y})">${team.c}</text>
+      </g>
     </g>`;
   }
 
@@ -555,19 +900,21 @@ function drawNode(angle, radius, winnerEntry, eliminatedInfo, isLatest){
     const elim = eliminatedMap.get(entry.team.c);
     return (elim && elim.level === level) ? elim : null;
   }
-  l1Angles.forEach((a,j)=> { const e=level1Winners[j]; svgParts.push(drawNode(a, R_L1, e, terminalInfo(e,1), e && computeLatestLevel(e.team.c)===1)); });
-  l2Angles.forEach((a,k)=> { const e=level2Winners[k]; svgParts.push(drawNode(a, R_L2, e, terminalInfo(e,2), e && computeLatestLevel(e.team.c)===2)); });
-  l3Angles.forEach((a,m)=> { const e=level3Winners[m]; svgParts.push(drawNode(a, R_L3, e, terminalInfo(e,3), e && computeLatestLevel(e.team.c)===3)); });
-  l4Angles.forEach((a,n)=> { const e=level4Winners[n]; svgParts.push(drawNode(a, R_L4, e, terminalInfo(e,4), e && computeLatestLevel(e.team.c)===4)); });
+  l1Angles.forEach((a,j)=> { const e=level1Winners[j]; svgParts.push(drawNode(a, R_L1, e, terminalInfo(e,1), e && computeLatestLevel(e.team.c)===1, e && glowingTeams.has(e.team.c), e && travelOffsets[e.team.c])); });
+  l2Angles.forEach((a,k)=> { const e=level2Winners[k]; svgParts.push(drawNode(a, R_L2, e, terminalInfo(e,2), e && computeLatestLevel(e.team.c)===2, e && glowingTeams.has(e.team.c), e && travelOffsets[e.team.c])); });
+  l3Angles.forEach((a,m)=> { const e=level3Winners[m]; svgParts.push(drawNode(a, R_L3, e, terminalInfo(e,3), e && computeLatestLevel(e.team.c)===3, e && glowingTeams.has(e.team.c), e && travelOffsets[e.team.c])); });
+  l4Angles.forEach((a,n)=> { const e=level4Winners[n]; svgParts.push(drawNode(a, R_L4, e, terminalInfo(e,4), e && computeLatestLevel(e.team.c)===4, e && glowingTeams.has(e.team.c), e && travelOffsets[e.team.c])); });
 
   r32.forEach((m,j)=>{
     const w = winnerOf(m);
-    [{team:m.home, angle:leafAngles[j*2]},{team:m.away, angle:leafAngles[j*2+1]}].forEach(({team,angle})=>{
+    [{team:m.home, angle:leafAngles[j*2], own:m.score?.[0], opp:m.score?.[1], other:m.away},
+     {team:m.away, angle:leafAngles[j*2+1], own:m.score?.[1], opp:m.score?.[0], other:m.home}]
+    .forEach(({team,angle,own,opp,other})=>{
       const p = polar(R_LEAF, angle);
       const elim = eliminatedMap.get(team.c);
       const isEliminatedAnywhere = !!elim; // dim the starting flag once they're out, at any round
       const isWinner = w && team===w;
-      const ringColor = isEliminatedAnywhere ? ELIMINATED_COLOR : (isWinner ? palette[j % palette.length] : '#6E8577');
+      const ringColor = isEliminatedAnywhere ? ELIMINATED_COLOR : (isWinner ? WIN_COLOR : '#6E8577');
 
       const opacity = isEliminatedAnywhere ? 0.45 : 1;
       const labelR = R_LEAF + 34;
@@ -575,13 +922,23 @@ function drawNode(angle, radius, winnerEntry, eliminatedInfo, isLatest){
       let rot = angle, anchor = 'start';
       if(angle > 90 && angle < 270){ rot = angle + 180; anchor='end'; }
       const labelColor = isEliminatedAnywhere ? ELIMINATED_COLOR : (isWinner?'#D4A537':'#9FB3A8');
+      const liveResult = (m.status === 'final') ? findMatchResult(lastEvents, m.home.c, m.away.c) : null;
+      const attr = (m.status === 'final')
+        ? matchDataAttr(team, {
+            round:'Round of 32', opponent:other, ownScore:own, opponentScore:opp, decidedOnPk: !!m.pk,
+            date: liveResult?.date || null, venue: liveResult?.venue || null, city: liveResult?.city || null,
+            goals: liveResult?.goals || [],
+          })
+        : '';
       // Background disc stays fully opaque outside the translucent group so
       // no dashed path can ever show through a dimmed flag.
-      svgParts.push(`<circle cx="${p.x}" cy="${p.y}" r="16" fill="#0E241A"/>
-      <g opacity="${opacity}">
-        <circle cx="${p.x}" cy="${p.y}" r="16" fill="none" stroke="${ringColor}" stroke-width="2.5"/>
-        ${flagImg(team.c, p.x, p.y, 28)}
-        <text x="${lp.x}" y="${lp.y}" font-size="11" font-family="DM Mono, monospace" fill="${labelColor}" text-anchor="${anchor}" transform="rotate(${rot} ${lp.x} ${lp.y})">${team.c}</text>
+      svgParts.push(`<g class="match-tap" ${attr}>
+        <circle cx="${p.x}" cy="${p.y}" r="16" fill="#0E241A"/>
+        <g opacity="${opacity}">
+          <circle cx="${p.x}" cy="${p.y}" r="16" fill="none" stroke="${ringColor}" stroke-width="2.5"/>
+          ${flagImg(team.c, p.x, p.y, 28)}
+          <text x="${lp.x}" y="${lp.y}" font-size="11" font-family="DM Mono, monospace" fill="${labelColor}" text-anchor="${anchor}" transform="rotate(${rot} ${lp.x} ${lp.y})">${team.c}</text>
+        </g>
       </g>`);
     });
   });
@@ -681,6 +1038,8 @@ function resolveInternalCode(espnTeam){
   return null;
 }
 
+let upcomingEventsCache = [];
+
 function renderUpcoming(events){
   const container = document.getElementById('upcomingList');
   if(!container) return;
@@ -691,9 +1050,11 @@ function renderUpcoming(events){
       const comp = e.competitions[0];
       const home = comp.competitors.find(c => c.homeAway === 'home');
       const away = comp.competitors.find(c => c.homeAway === 'away');
-      return { date: new Date(e.date), home, away };
+      return { date: new Date(e.date), home, away, raw: e };
     })
     .sort((a,b) => a.date - b.date);
+
+  upcomingEventsCache = upcoming.map(m => m.raw);
 
   if(upcoming.length === 0){
     container.innerHTML = '<div class="upcoming-empty">No upcoming matches confirmed yet — check back after the next sync.</div>';
@@ -707,8 +1068,8 @@ function renderUpcoming(events){
     return `${img}<span>${code}</span>`;
   }
 
-  function rowHTML(m){
-    return `<div class="upcoming-row">
+  function rowHTML(m, idx){
+    return `<div class="upcoming-row" data-upcoming-idx="${idx}">
       <div class="upcoming-teams">
         ${teamHTML(m.home)}<span class="upcoming-vs">vs</span>${teamHTML(m.away)}
       </div>
@@ -717,13 +1078,12 @@ function renderUpcoming(events){
   }
 
   const VISIBLE_DEFAULT = 3;
-  const rowsHTML = upcoming.map(rowHTML).join('');
   const hasMore = upcoming.length > VISIBLE_DEFAULT;
   const chevronSVG = `<svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
 
   container.innerHTML = `
-    <div id="upcomingVisible">${upcoming.slice(0, VISIBLE_DEFAULT).map(rowHTML).join('')}</div>
-    <div id="upcomingRest">${upcoming.slice(VISIBLE_DEFAULT).map(rowHTML).join('')}</div>
+    <div id="upcomingVisible">${upcoming.slice(0, VISIBLE_DEFAULT).map((m,i)=>rowHTML(m,i)).join('')}</div>
+    <div id="upcomingRest">${upcoming.slice(VISIBLE_DEFAULT).map((m,i)=>rowHTML(m,i+VISIBLE_DEFAULT)).join('')}</div>
     ${hasMore ? `<button id="upcomingMoreBtn" class="upcoming-more-btn">${chevronSVG}<span id="upcomingMoreLabel">Show more</span></button>` : ''}
   `;
 
@@ -932,6 +1292,204 @@ async function sendHeartbeat(){
 }
 sendHeartbeat();
 setInterval(sendHeartbeat, 20000);
+
+// ---------- Wheel gestures: single-finger drag rotates, pinch zooms — scoped to just the wheel ----------
+(function(){
+  const wrap = document.querySelector('.wheel-wrap');
+  const svg = document.getElementById('wheel');
+  if(!wrap || !svg) return;
+
+  let rotation = 0;
+  let scale = 1;
+  const MIN_SCALE = 1, MAX_SCALE = 4;
+  let mode = null; // 'rotate' | 'pinch'
+  let startAngle = 0, startRotation = 0;
+  let startDist = 0, startScale = 1;
+
+  function applyTransform(){
+    svg.style.transform = `rotate(${rotation}deg) scale(${scale})`;
+  }
+  function wheelCenter(){
+    const r = svg.getBoundingClientRect();
+    return { x: r.left + r.width/2, y: r.top + r.height/2 };
+  }
+  function angleFor(x, y){
+    const c = wheelCenter();
+    return Math.atan2(y - c.y, x - c.x) * 180 / Math.PI;
+  }
+  function distFor(t1, t2){
+    return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+  }
+  function handleStart(touches){
+    if(touches.length === 1){
+      mode = 'rotate';
+      startAngle = angleFor(touches[0].clientX, touches[0].clientY);
+      startRotation = rotation;
+    } else if(touches.length >= 2){
+      mode = 'pinch';
+      startDist = distFor(touches[0], touches[1]);
+      startScale = scale;
+    }
+  }
+  function handleMove(touches){
+    if(mode === 'rotate' && touches.length === 1){
+      const a = angleFor(touches[0].clientX, touches[0].clientY);
+      rotation = startRotation + (a - startAngle);
+      applyTransform();
+    } else if(mode === 'pinch' && touches.length >= 2){
+      const d = distFor(touches[0], touches[1]);
+      scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, startScale * (d / startDist)));
+      applyTransform();
+    }
+  }
+
+  wrap.addEventListener('touchstart', (e) => { handleStart(e.touches); }, { passive:true });
+  wrap.addEventListener('touchmove', (e) => {
+    e.preventDefault(); // keep page from scrolling/zooming while interacting with the wheel
+    handleMove(e.touches);
+  }, { passive:false });
+  wrap.addEventListener('touchend', (e) => {
+    if(e.touches.length >= 1) handleStart(e.touches); // re-anchor if switching finger count mid-gesture
+    else mode = null;
+  });
+
+  // Mouse-drag rotate, for desktop use
+  let mouseDown = false;
+  wrap.addEventListener('mousedown', (e) => {
+    mouseDown = true;
+    mode = 'rotate';
+    startAngle = angleFor(e.clientX, e.clientY);
+    startRotation = rotation;
+  });
+  window.addEventListener('mousemove', (e) => {
+    if(!mouseDown) return;
+    const a = angleFor(e.clientX, e.clientY);
+    rotation = startRotation + (a - startAngle);
+    applyTransform();
+  });
+  window.addEventListener('mouseup', () => { mouseDown = false; });
+
+  // Desktop scroll-wheel zoom, scoped to the wheel only
+  wrap.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.08 : 0.93;
+    scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale * factor));
+    applyTransform();
+  }, { passive:false });
+})();
+
+// ---------- Match info popup: tap a flag to see the match it was decided in ----------
+(function(){
+  const svg = document.getElementById('wheel');
+  const overlay = document.getElementById('matchOverlay');
+  if(!svg || !overlay) return;
+
+  function closeOverlay(){ overlay.classList.remove('open'); }
+
+  function renderGoals(goals){
+    if(!goals || !goals.length) return '';
+    const icon = (type) => type === 'Penalty' ? '🎯' : type === 'Own Goal' ? '⚠️' : '⚽';
+    const rows = goals.map(g => `
+      <div class="match-popup-goal-row">
+        <span class="match-popup-goal-min">${g.minute}</span>
+        <span class="match-popup-goal-player">${icon(g.type)} ${g.player}</span>
+        <span class="match-popup-goal-team">${g.teamCode}${g.type !== 'Goal' ? ' · ' + g.type : ''}</span>
+      </div>
+    `).join('');
+    return `<div class="match-popup-goals-title">Goals</div>${rows}`;
+  }
+
+  svg.addEventListener('click', (e) => {
+    const g = e.target.closest('.match-tap');
+    if(!g || !g.hasAttribute('data-match')) return;
+    let info;
+    try{ info = JSON.parse(decodeURIComponent(g.getAttribute('data-match'))); }catch(err){ return; }
+
+    const teamIso = FLAG_ISO[info.teamCode], oppIso = FLAG_ISO[info.oppCode];
+    const scoreLine = `${info.teamCode} ${info.ownScore} – ${info.oppScore} ${info.oppCode}`;
+    const pkNote = info.pk ? '<div class="match-popup-pk">Decided on penalties</div>' : '';
+    const dateLine = info.date ? new Date(info.date).toLocaleString('en-US', { weekday:'short', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+    const venueLine = [info.venue, info.city].filter(Boolean).join(' · ');
+
+    document.getElementById('matchPopupRound').textContent = info.round;
+    document.getElementById('matchPopupTeams').innerHTML = `
+      ${teamIso ? `<img src="https://flagcdn.com/w80/${teamIso}.png" alt="">` : ''}
+      <span>${info.teamName}</span>
+      <span class="match-popup-vs">vs</span>
+      <span>${info.oppName}</span>
+      ${oppIso ? `<img src="https://flagcdn.com/w80/${oppIso}.png" alt="">` : ''}
+    `;
+    document.getElementById('matchPopupScore').textContent = scoreLine;
+    document.getElementById('matchPopupPk').innerHTML = pkNote;
+    document.getElementById('matchPopupMeta').textContent = [dateLine, venueLine].filter(Boolean).join(' — ');
+    document.getElementById('matchPopupGoals').innerHTML = renderGoals(info.goals);
+    overlay.classList.add('open');
+  });
+
+  overlay.addEventListener('click', (e) => {
+    if(e.target === overlay) closeOverlay();
+  });
+  document.getElementById('matchPopupClose').addEventListener('click', closeOverlay);
+})();
+
+// ---------- Prediction popup: tap an upcoming match to see win probabilities ----------
+(function(){
+  const list = document.getElementById('upcomingList');
+  const overlay = document.getElementById('predictOverlay');
+  if(!list || !overlay) return;
+
+  function closeOverlay(){ overlay.classList.remove('open'); }
+
+  list.addEventListener('click', (e) => {
+    const row = e.target.closest('.upcoming-row');
+    if(!row) return;
+    const idx = Number(row.getAttribute('data-upcoming-idx'));
+    const ev = upcomingEventsCache[idx];
+    if(!ev) return;
+
+    const comp = ev.competitions[0];
+    const home = comp.competitors.find(c => c.homeAway === 'home');
+    const away = comp.competitors.find(c => c.homeAway === 'away');
+    const homeCode = resolveInternalCode(home.team) || home.team.abbreviation;
+    const awayCode = resolveInternalCode(away.team) || away.team.abbreviation;
+    const homeIso = FLAG_ISO[homeCode], awayIso = FLAG_ISO[awayCode];
+
+    document.getElementById('predictPopupTeams').innerHTML = `
+      ${homeIso ? `<img src="https://flagcdn.com/w80/${homeIso}.png" alt="">` : ''}
+      <span>${home.team.displayName}</span>
+      <span class="match-popup-vs">vs</span>
+      <span>${away.team.displayName}</span>
+      ${awayIso ? `<img src="https://flagcdn.com/w80/${awayIso}.png" alt="">` : ''}
+    `;
+
+    const odds = getOddsInfo(ev);
+    const body = document.getElementById('predictPopupBody');
+    if(!odds){
+      body.innerHTML = `<div class="predict-unavailable">No prediction available yet for this match — sportsbooks usually post odds a few days before kickoff.</div>`;
+    } else {
+      const drawPct = odds.draw ?? 0;
+      body.innerHTML = `
+        <div class="predict-labels">
+          <span><b>${odds.home}%</b> ${homeCode}</span>
+          ${odds.draw !== null ? `<span>Draw ${odds.draw}%</span>` : ''}
+          <span><b>${odds.away}%</b> ${awayCode}</span>
+        </div>
+        <div class="predict-bar">
+          <div style="width:${odds.home}%; background:#D4A537"></div>
+          <div style="width:${drawPct}%; background:#7C9388"></div>
+          <div style="width:${odds.away}%; background:#C8453C"></div>
+        </div>
+        <div class="predict-source">Based on ${odds.provider} odds${odds.overUnder ? ` · O/U ${odds.overUnder} goals` : ''}</div>
+      `;
+    }
+    overlay.classList.add('open');
+  });
+
+  overlay.addEventListener('click', (e) => {
+    if(e.target === overlay) closeOverlay();
+  });
+  document.getElementById('predictPopupClose').addEventListener('click', closeOverlay);
+})();
 </script>
 </body>
 </html>
