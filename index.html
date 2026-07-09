@@ -24,6 +24,7 @@
     color: var(--ink);
     font-family:'Oswald', sans-serif;
     padding: 18px 0 40px;
+    overscroll-behavior-y: contain;
   }
   header{
     padding: 32px 16px 14px 16px;
@@ -45,6 +46,25 @@
     font-size:11px;
     color: var(--gold);
   }
+  #shareBtn{
+    position:fixed;
+    top:16px;
+    right:16px;
+    z-index:30;
+    display:flex;
+    align-items:center;
+    gap:3px;
+    background:transparent;
+    border:1px solid var(--gold);
+    border-radius:14px;
+    padding:4px 10px;
+    font-family:'DM Mono', monospace;
+    font-size:9.5px;
+    color: var(--gold);
+    cursor:pointer;
+    line-height:1;
+  }
+  #shareBtn svg{ display:block; flex-shrink:0; width:10px; height:10px; }
   .eyebrow{
     font-family:'DM Mono', monospace;
     font-size:10.5px;
@@ -63,6 +83,7 @@
     padding: 0 6px;
     touch-action: none;
     overflow: hidden;
+    overscroll-behavior: contain;
     aspect-ratio: 1 / 1;
     box-sizing: border-box;
     position: relative;
@@ -368,6 +389,15 @@
   <span aria-hidden="true">👁</span><span id="viewerCount">–</span>
 </div>
 
+<button id="shareBtn" aria-label="Share">
+  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M12 3v12"/>
+    <path d="M7 8l5-5 5 5"/>
+    <path d="M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/>
+  </svg>
+  <span id="shareBtnLabel">Share</span>
+</button>
+
 <header>
   <div class="eyebrow">FIFA World Cup 2026 · Knockout Wheel</div>
   <h1>Winners Tracker</h1>
@@ -376,6 +406,10 @@
 
 <div class="wheel-wrap">
   <svg id="wheel" viewBox="-30 -30 860 860" xmlns="http://www.w3.org/2000/svg"></svg>
+</div>
+
+<div style="text-align:center; margin-top:12px;">
+  <button id="resetWheelBtn" style="font-family:'DM Mono',monospace; font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:#D4A537; background:transparent; border:1px solid #3A5548; border-radius:20px; padding:7px 16px; cursor:pointer;">↺ Reset view</button>
 </div>
 
 <div id="matchOverlay" class="match-overlay">
@@ -1328,6 +1362,33 @@ setInterval(sendHeartbeat, 20000);
     const trophyGroup = document.getElementById('trophyGroup');
     if(trophyGroup) trophyGroup.setAttribute('transform', `rotate(${-rotation} 400 400)`);
   }
+
+  // Smoothly animates back to the default view (no zoom, no pan, no rotation).
+  // Exposed globally so the "Reset view" button below the wheel can call it.
+  window.resetWheelView = function(){
+    const startVb = { ...vb };
+    const startRot = rotation;
+    const targetRot = Math.round(startRot / 360) * 360; // spin back the short way, not necessarily to 0
+    const duration = 500;
+    const t0 = performance.now();
+    function step(now){
+      const t = Math.min(1, (now - t0) / duration);
+      const eased = 1 - Math.pow(1 - t, 3); // ease-out
+      vb = {
+        x: startVb.x + (BASE_VB.x - startVb.x) * eased,
+        y: startVb.y + (BASE_VB.y - startVb.y) * eased,
+        w: startVb.w + (BASE_VB.w - startVb.w) * eased,
+        h: startVb.h + (BASE_VB.h - startVb.h) * eased,
+      };
+      rotation = startRot + (targetRot - startRot) * eased;
+      applyViewBox();
+      applyRotation();
+      if(t < 1) requestAnimationFrame(step);
+      else { vb = { ...BASE_VB }; rotation = targetRot % 360; applyViewBox(); applyRotation(); }
+    }
+    requestAnimationFrame(step);
+  };
+
   // Use the CONTAINER's rect (never rotates) rather than the SVG's own rect
   // (which would reflect the rotated bounding box) for stable touch mapping.
   function containerRect(){ return wrap.getBoundingClientRect(); }
@@ -1396,7 +1457,7 @@ setInterval(sendHeartbeat, 20000);
     }
   }
 
-  wrap.addEventListener('touchstart', (e) => { handleStart(e.touches); }, { passive:true });
+  wrap.addEventListener('touchstart', (e) => { e.preventDefault(); handleStart(e.touches); }, { passive:false });
   wrap.addEventListener('touchmove', (e) => {
     e.preventDefault(); // keep page from scrolling/zooming while interacting with the wheel
     handleMove(e.touches);
@@ -1553,6 +1614,41 @@ setInterval(sendHeartbeat, 20000);
     if(e.target === overlay) closeOverlay();
   });
   document.getElementById('predictPopupClose').addEventListener('click', closeOverlay);
+})();
+
+// ---------- Reset wheel view button ----------
+(function(){
+  const btn = document.getElementById('resetWheelBtn');
+  if(!btn) return;
+  btn.addEventListener('click', () => {
+    if(typeof window.resetWheelView === 'function') window.resetWheelView();
+  });
+})();
+
+// ---------- Share button ----------
+(function(){
+  const btn = document.getElementById('shareBtn');
+  if(!btn) return;
+  btn.addEventListener('click', async () => {
+    const shareData = {
+      title: 'World Cup 2026 — Winners Tracker',
+      text: 'Follow the World Cup 2026 knockout bracket live:',
+      url: location.href,
+    };
+    if(navigator.share){
+      try{ await navigator.share(shareData); }catch(e){ /* user cancelled — do nothing */ }
+      return;
+    }
+    try{
+      await navigator.clipboard.writeText(location.href);
+      const label = document.getElementById('shareBtnLabel');
+      const original = label.textContent;
+      label.textContent = 'Copied!';
+      setTimeout(() => { label.textContent = original; }, 1500);
+    }catch(e){
+      // Clipboard blocked — nothing more we can do silently.
+    }
+  });
 })();
 </script>
 </body>
