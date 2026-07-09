@@ -62,9 +62,12 @@
     margin: 10px auto 0;
     padding: 0 6px;
     touch-action: none;
-    overflow: visible;
+    overflow: hidden;
+    aspect-ratio: 1 / 1;
+    box-sizing: border-box;
+    position: relative;
   }
-  svg{ width:100%; height:auto; display:block; transform-origin: 50% 50%; will-change: transform; }
+  svg{ width:100%; height:100%; display:block; transform-origin: 50% 50%; will-change: transform; }
   .qualified circle{ animation: pulse 2.4s ease-in-out infinite; }
   @keyframes pulse{
     0%,100%{ filter: drop-shadow(0 0 0 rgba(212,165,55,0)); }
@@ -475,6 +478,7 @@ let lastEvents = [];
 let previousLatestLevels = null;
 let glowingTeams = new Set();
 let animatedThisSession = new Set(); // teams whose slide-in animation has already played once
+let currentWheelRotation = 0; // synced with the live drag-rotation, so the trophy can counter-rotate to stay upright
 
 function winnerOf(m){
   if(m.status !== 'final') return null;
@@ -784,7 +788,7 @@ function renderWheel(r32){
     function leafEdgeInfo(team, ownScore){
       const elim = eliminatedMap.get(team.c);
       const played = m.status === 'final';
-      if(elim && elim.level === 0) return { color: ELIMINATED_COLOR, dashed: true, score: played ? ownScore : undefined };
+      if(elim) return { color: ELIMINATED_COLOR, dashed: false, score: played ? ownScore : undefined };
       if(w && w === team) return { color, dashed: false, score: played ? ownScore : undefined };
       return { color: '#3A5548', dashed: true, score: undefined };
     }
@@ -800,7 +804,7 @@ function renderWheel(r32){
     function edgeInfo(child, advanced){
       if(!child) return { color:'#3A5548', dashed:true, score: undefined };
       const elim = eliminatedMap.get(child.team.c);
-      if(elim && elim.level === targetLevel) return { color: ELIMINATED_COLOR, dashed: true, score: elim.score };
+      if(elim) return { color: ELIMINATED_COLOR, dashed: false, score: (elim.level === targetLevel) ? elim.score : child.score };
       if(advanced && advanced.team === child.team) return { color: child.color, dashed: false, score: advanced.score };
       return { color: '#3A5548', dashed: true, score: undefined };
     }
@@ -823,7 +827,7 @@ function renderWheel(r32){
   function finalEdgeInfo(child){
     if(!child) return { color:'#3A5548', dashed:true, score: undefined };
     const elim = eliminatedMap.get(child.team.c);
-    if(elim && elim.level === 4) return { color: ELIMINATED_COLOR, dashed: true, score: elim.score };
+    if(elim) return { color: ELIMINATED_COLOR, dashed: false, score: (elim.level === 4) ? elim.score : child.score };
     if(champion && champion.team === child.team) return { color: child.color, dashed: false, score: champion.score };
     return { color: '#3A5548', dashed: true, score: undefined };
   }
@@ -846,7 +850,7 @@ function renderWheel(r32){
 function flagImg(code, cx, cy, size){
   const iso = FLAG_ISO[code];
   const r = size/2;
-  return `<image href="https://flagcdn.com/w80/${iso}.png" x="${cx-r}" y="${cy-r}" width="${size}" height="${size}" preserveAspectRatio="xMidYMid slice" style="clip-path:circle(50%)" />`;
+  return `<image href="https://flagcdn.com/w160/${iso}.png" x="${cx-r}" y="${cy-r}" width="${size}" height="${size}" preserveAspectRatio="xMidYMid slice" style="clip-path:circle(50%)" />`;
 }
 
 // Packs a match's details into an HTML-attribute-safe string for the popup to read on tap.
@@ -951,13 +955,15 @@ function drawNode(angle, radius, winnerEntry, eliminatedInfo, isLatest, recently
       </radialGradient>
     </defs>
     ${svgParts.join('')}
-    <circle cx="${CX}" cy="${CY}" r="60" fill="url(#glow)"/>
-    <text x="${CX}" y="${CY+14}" font-size="34" text-anchor="middle">🏆</text>
-    ${champion ? `
-      <circle cx="${CX}" cy="${CY-46}" r="15" fill="#0E241A" stroke="${champion.color}" stroke-width="3"/>
-      ${flagImg(champion.team.c, CX, CY-46, 26)}
-      <text x="${CX}" y="${CY-66}" font-size="9.5" font-family="DM Mono, monospace" fill="#D4A537" text-anchor="middle" letter-spacing="1">CHAMPION</text>
-    ` : ''}
+    <g id="trophyGroup" transform="rotate(${-currentWheelRotation} ${CX} ${CY})">
+      <circle cx="${CX}" cy="${CY}" r="60" fill="url(#glow)"/>
+      <text x="${CX}" y="${CY+14}" font-size="34" text-anchor="middle">🏆</text>
+      ${champion ? `
+        <circle cx="${CX}" cy="${CY-46}" r="15" fill="#0E241A" stroke="${champion.color}" stroke-width="3"/>
+        ${flagImg(champion.team.c, CX, CY-46, 26)}
+        <text x="${CX}" y="${CY-66}" font-size="9.5" font-family="DM Mono, monospace" fill="#D4A537" text-anchor="middle" letter-spacing="1">CHAMPION</text>
+      ` : ''}
+    </g>
   `;
 }
 
@@ -1308,6 +1314,11 @@ setInterval(sendHeartbeat, 20000);
 
   function applyTransform(){
     svg.style.transform = `rotate(${rotation}deg) scale(${scale})`;
+    // Keep the module-level value in sync, and immediately counter-rotate the
+    // trophy group so it stays upright and fixed even while dragging live.
+    currentWheelRotation = rotation;
+    const trophyGroup = document.getElementById('trophyGroup');
+    if(trophyGroup) trophyGroup.setAttribute('transform', `rotate(${-rotation} 400 400)`);
   }
   function wheelCenter(){
     const r = svg.getBoundingClientRect();
@@ -1320,15 +1331,26 @@ setInterval(sendHeartbeat, 20000);
   function distFor(t1, t2){
     return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
   }
+  function setPinchOrigin(x, y){
+    // Zoom expands from wherever the pinch is happening, not always dead center.
+    const r = svg.getBoundingClientRect();
+    const originX = ((x - r.left) / r.width) * 100;
+    const originY = ((y - r.top) / r.height) * 100;
+    svg.style.transformOrigin = `${originX}% ${originY}%`;
+  }
   function handleStart(touches){
     if(touches.length === 1){
       mode = 'rotate';
       startAngle = angleFor(touches[0].clientX, touches[0].clientY);
       startRotation = rotation;
+      svg.style.transformOrigin = '50% 50%'; // rotation always happens around the true center
     } else if(touches.length >= 2){
       mode = 'pinch';
       startDist = distFor(touches[0], touches[1]);
       startScale = scale;
+      const midX = (touches[0].clientX + touches[1].clientX) / 2;
+      const midY = (touches[0].clientY + touches[1].clientY) / 2;
+      setPinchOrigin(midX, midY);
     }
   }
   function handleMove(touches){
@@ -1360,6 +1382,7 @@ setInterval(sendHeartbeat, 20000);
     mode = 'rotate';
     startAngle = angleFor(e.clientX, e.clientY);
     startRotation = rotation;
+    svg.style.transformOrigin = '50% 50%';
   });
   window.addEventListener('mousemove', (e) => {
     if(!mouseDown) return;
@@ -1369,9 +1392,10 @@ setInterval(sendHeartbeat, 20000);
   });
   window.addEventListener('mouseup', () => { mouseDown = false; });
 
-  // Desktop scroll-wheel zoom, scoped to the wheel only
+  // Desktop scroll-wheel zoom, centered on the cursor, scoped to the wheel only
   wrap.addEventListener('wheel', (e) => {
     e.preventDefault();
+    setPinchOrigin(e.clientX, e.clientY);
     const factor = e.deltaY < 0 ? 1.08 : 0.93;
     scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale * factor));
     applyTransform();
