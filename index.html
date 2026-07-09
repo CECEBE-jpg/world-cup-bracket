@@ -67,7 +67,7 @@
     box-sizing: border-box;
     position: relative;
   }
-  svg{ width:100%; height:100%; display:block; transform-origin: 50% 50%; will-change: transform; }
+  svg{ width:100%; height:100%; display:block; transform-origin: 50% 50%; }
   .qualified circle{ animation: pulse 2.4s ease-in-out infinite; }
   @keyframes pulse{
     0%,100%{ filter: drop-shadow(0 0 0 rgba(212,165,55,0)); }
@@ -1299,69 +1299,100 @@ async function sendHeartbeat(){
 sendHeartbeat();
 setInterval(sendHeartbeat, 20000);
 
-// ---------- Wheel gestures: single-finger drag rotates, pinch zooms — scoped to just the wheel ----------
+// ---------- Wheel gestures: one finger rotates; two fingers pan, zoom, and twist-rotate together ----------
+// Zoom/pan changes the SVG's viewBox directly instead of a CSS scale transform,
+// so the browser genuinely re-renders the vector content crisply at every
+// zoom level instead of stretching a pre-rasterized bitmap (which is what
+// was causing the blurry text/flags).
 (function(){
   const wrap = document.querySelector('.wheel-wrap');
   const svg = document.getElementById('wheel');
   if(!wrap || !svg) return;
 
+  const BASE_VB = { x:-30, y:-30, w:860, h:860 };
+  let vb = { ...BASE_VB };
   let rotation = 0;
-  let scale = 1;
-  const MIN_SCALE = 1, MAX_SCALE = 4;
-  let mode = null; // 'rotate' | 'pinch'
-  let startAngle = 0, startRotation = 0;
-  let startDist = 0, startScale = 1;
+  const MIN_W = BASE_VB.w / 4; // 4x max zoom
+  const MAX_W = BASE_VB.w;     // fully zoomed out
 
-  function applyTransform(){
-    svg.style.transform = `rotate(${rotation}deg) scale(${scale})`;
-    // Keep the module-level value in sync, and immediately counter-rotate the
-    // trophy group so it stays upright and fixed even while dragging live.
+  let mode = null; // 'rotate' | 'twotouch'
+  let startAngle = 0, startRotation = 0;
+  let start2 = null;
+
+  function applyViewBox(){
+    svg.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+  }
+  function applyRotation(){
+    svg.style.transform = `rotate(${rotation}deg)`;
     currentWheelRotation = rotation;
     const trophyGroup = document.getElementById('trophyGroup');
     if(trophyGroup) trophyGroup.setAttribute('transform', `rotate(${-rotation} 400 400)`);
   }
-  function wheelCenter(){
-    const r = svg.getBoundingClientRect();
-    return { x: r.left + r.width/2, y: r.top + r.height/2 };
-  }
+  // Use the CONTAINER's rect (never rotates) rather than the SVG's own rect
+  // (which would reflect the rotated bounding box) for stable touch mapping.
+  function containerRect(){ return wrap.getBoundingClientRect(); }
   function angleFor(x, y){
-    const c = wheelCenter();
-    return Math.atan2(y - c.y, x - c.x) * 180 / Math.PI;
+    const r = containerRect();
+    const cx = r.left + r.width/2, cy = r.top + r.height/2;
+    return Math.atan2(y - cy, x - cx) * 180 / Math.PI;
   }
-  function distFor(t1, t2){
-    return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
-  }
-  function setPinchOrigin(x, y){
-    // Zoom expands from wherever the pinch is happening, not always dead center.
-    const r = svg.getBoundingClientRect();
-    const originX = ((x - r.left) / r.width) * 100;
-    const originY = ((y - r.top) / r.height) * 100;
-    svg.style.transformOrigin = `${originX}% ${originY}%`;
-  }
+  function distBetween(t1, t2){ return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY); }
+  function angleBetween(t1, t2){ return Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX) * 180 / Math.PI; }
+
   function handleStart(touches){
     if(touches.length === 1){
       mode = 'rotate';
       startAngle = angleFor(touches[0].clientX, touches[0].clientY);
       startRotation = rotation;
-      svg.style.transformOrigin = '50% 50%'; // rotation always happens around the true center
     } else if(touches.length >= 2){
-      mode = 'pinch';
-      startDist = distFor(touches[0], touches[1]);
-      startScale = scale;
-      const midX = (touches[0].clientX + touches[1].clientX) / 2;
-      const midY = (touches[0].clientY + touches[1].clientY) / 2;
-      setPinchOrigin(midX, midY);
+      mode = 'twotouch';
+      const t1 = touches[0], t2 = touches[1];
+      start2 = {
+        dist: distBetween(t1, t2),
+        angle: angleBetween(t1, t2),
+        midClient: { x:(t1.clientX+t2.clientX)/2, y:(t1.clientY+t2.clientY)/2 },
+        vb: { ...vb },
+        rotation,
+      };
     }
   }
+
   function handleMove(touches){
     if(mode === 'rotate' && touches.length === 1){
       const a = angleFor(touches[0].clientX, touches[0].clientY);
       rotation = startRotation + (a - startAngle);
-      applyTransform();
-    } else if(mode === 'pinch' && touches.length >= 2){
-      const d = distFor(touches[0], touches[1]);
-      scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, startScale * (d / startDist)));
-      applyTransform();
+      applyRotation();
+    } else if(mode === 'twotouch' && touches.length >= 2){
+      const t1 = touches[0], t2 = touches[1];
+      const newDist = distBetween(t1, t2);
+      const newAngle = angleBetween(t1, t2);
+      const newMidClient = { x:(t1.clientX+t2.clientX)/2, y:(t1.clientY+t2.clientY)/2 };
+
+      const zoomFactor = newDist / start2.dist;
+      let newW = start2.vb.w / zoomFactor;
+      newW = Math.min(MAX_W, Math.max(MIN_W, newW));
+      const newH = newW;
+
+      const r = containerRect();
+      // The content point that was under the fingers when the gesture started...
+      const startRelX = (start2.midClient.x - r.left) / r.width;
+      const startRelY = (start2.midClient.y - r.top) / r.height;
+      const anchorX = start2.vb.x + startRelX * start2.vb.w;
+      const anchorY = start2.vb.y + startRelY * start2.vb.h;
+      // ...should stay under the fingers' CURRENT position — this is what
+      // makes pinch-zoom anchor correctly AND makes dragging two fingers pan.
+      const curRelX = (newMidClient.x - r.left) / r.width;
+      const curRelY = (newMidClient.y - r.top) / r.height;
+
+      vb = {
+        x: anchorX - curRelX * newW,
+        y: anchorY - curRelY * newH,
+        w: newW, h: newH,
+      };
+      applyViewBox();
+
+      rotation = start2.rotation + (newAngle - start2.angle);
+      applyRotation();
     }
   }
 
@@ -1382,23 +1413,32 @@ setInterval(sendHeartbeat, 20000);
     mode = 'rotate';
     startAngle = angleFor(e.clientX, e.clientY);
     startRotation = rotation;
-    svg.style.transformOrigin = '50% 50%';
   });
   window.addEventListener('mousemove', (e) => {
     if(!mouseDown) return;
     const a = angleFor(e.clientX, e.clientY);
     rotation = startRotation + (a - startAngle);
-    applyTransform();
+    applyRotation();
   });
   window.addEventListener('mouseup', () => { mouseDown = false; });
 
-  // Desktop scroll-wheel zoom, centered on the cursor, scoped to the wheel only
+  // Desktop scroll-wheel zoom, anchored on the cursor, via viewBox (same crisp rendering)
   wrap.addEventListener('wheel', (e) => {
     e.preventDefault();
-    setPinchOrigin(e.clientX, e.clientY);
-    const factor = e.deltaY < 0 ? 1.08 : 0.93;
-    scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale * factor));
-    applyTransform();
+    const r = containerRect();
+    const relX = (e.clientX - r.left) / r.width;
+    const relY = (e.clientY - r.top) / r.height;
+    const anchorX = vb.x + relX * vb.w;
+    const anchorY = vb.y + relY * vb.h;
+    const factor = e.deltaY < 0 ? 0.92 : 1.08; // <1 shrinks viewBox (zoom in), >1 grows it (zoom out)
+    let newW = Math.min(MAX_W, Math.max(MIN_W, vb.w * factor));
+    const newH = newW;
+    vb = {
+      x: anchorX - relX * newW,
+      y: anchorY - relY * newH,
+      w: newW, h: newH,
+    };
+    applyViewBox();
   }, { passive:false });
 })();
 
