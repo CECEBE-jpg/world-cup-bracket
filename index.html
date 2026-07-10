@@ -19,6 +19,7 @@
     --line: #3A5548;
   }
   *{ box-sizing:border-box; margin:0; padding:0; }
+  html, body{ overflow-x: hidden; max-width: 100%; }
   body{
     background: radial-gradient(circle at 50% 42%, #0E241A 0%, #05100B 60%, #030A07 100%);
     color: var(--ink);
@@ -1457,14 +1458,68 @@ setInterval(sendHeartbeat, 20000);
     }
   }
 
-  wrap.addEventListener('touchstart', (e) => { e.preventDefault(); handleStart(e.touches); }, { passive:false });
+  // Two touches always commit immediately (there's no "tap" ambiguity with a
+  // pinch). One touch waits until it's moved past a small threshold before
+  // committing to rotate-mode — this is what lets a genuine tap still fire
+  // its natural click (for the match popup) instead of being swallowed.
+  const TAP_THRESHOLD = 6; // px
+  let touchStartPoint = null;
+  let committed = false;
+
+  let lockedScrollY = 0;
+  function lockBodyScroll(lock){
+    if(lock){
+      lockedScrollY = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${lockedScrollY}px`;
+      document.body.style.left = '0';
+      document.body.style.right = '0';
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      document.body.style.overflow = '';
+      window.scrollTo(0, lockedScrollY);
+    }
+  }
+
+  wrap.addEventListener('touchstart', (e) => {
+    if(e.touches.length >= 2){
+      committed = true;
+      lockBodyScroll(true);
+      handleStart(e.touches);
+    } else {
+      committed = false;
+      touchStartPoint = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      handleStart(e.touches); // pre-compute rotate anchor, but don't commit/preventDefault yet
+    }
+  }, { passive: true });
+
   wrap.addEventListener('touchmove', (e) => {
-    e.preventDefault(); // keep page from scrolling/zooming while interacting with the wheel
+    if(!committed && e.touches.length === 1 && touchStartPoint){
+      const dx = e.touches[0].clientX - touchStartPoint.x;
+      const dy = e.touches[0].clientY - touchStartPoint.y;
+      if(Math.hypot(dx, dy) > TAP_THRESHOLD){
+        committed = true;
+        lockBodyScroll(true);
+      }
+    }
+    if(!committed) return; // still might just be a tap — let the browser handle it normally
+    e.preventDefault(); // now that it's a confirmed drag, keep the page from scrolling/zooming
     handleMove(e.touches);
-  }, { passive:false });
+  }, { passive: false });
+
   wrap.addEventListener('touchend', (e) => {
-    if(e.touches.length >= 1) handleStart(e.touches); // re-anchor if switching finger count mid-gesture
-    else mode = null;
+    if(e.touches.length >= 1){
+      handleStart(e.touches); // re-anchor if switching finger count mid-gesture
+    } else {
+      mode = null;
+      committed = false;
+      touchStartPoint = null;
+      lockBodyScroll(false);
+    }
   });
 
   // Mouse-drag rotate, for desktop use
