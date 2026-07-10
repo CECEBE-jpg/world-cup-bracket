@@ -19,7 +19,7 @@
     --line: #3A5548;
   }
   *{ box-sizing:border-box; margin:0; padding:0; }
-  html, body{ overflow-x: hidden; max-width: 100%; }
+  html, body{ overflow-x: hidden; max-width: 100%; background: #05100B; }
   body{
     background: radial-gradient(circle at 50% 42%, #0E241A 0%, #05100B 60%, #030A07 100%);
     color: var(--ink);
@@ -36,13 +36,15 @@
     top:16px;
     left:16px;
     z-index:30;
+    height:23px;
+    box-sizing:border-box;
     display:flex;
     align-items:center;
     gap:5px;
     background:transparent;
     border:1px solid var(--gold);
     border-radius:16px;
-    padding:4px 12px;
+    padding:0 12px;
     font-family:'DM Mono', monospace;
     font-size:11px;
     color: var(--gold);
@@ -52,20 +54,22 @@
     top:16px;
     right:16px;
     z-index:30;
+    height:23px;
+    box-sizing:border-box;
     display:flex;
     align-items:center;
-    gap:3px;
+    gap:5px;
     background:transparent;
     border:1px solid var(--gold);
-    border-radius:14px;
-    padding:4px 10px;
+    border-radius:16px;
+    padding:0 12px;
     font-family:'DM Mono', monospace;
-    font-size:9.5px;
+    font-size:11px;
     color: var(--gold);
     cursor:pointer;
     line-height:1;
   }
-  #shareBtn svg{ display:block; flex-shrink:0; width:10px; height:10px; }
+  #shareBtn svg{ display:block; flex-shrink:0; width:11px; height:11px; }
   .eyebrow{
     font-family:'DM Mono', monospace;
     font-size:10.5px;
@@ -81,15 +85,15 @@
     width:100%;
     max-width: 760px;
     margin: 10px auto 0;
-    padding: 0 6px;
     touch-action: none;
     overflow: hidden;
     overscroll-behavior: contain;
     aspect-ratio: 1 / 1;
     box-sizing: border-box;
     position: relative;
+    border-radius: 32px;
   }
-  svg{ width:100%; height:100%; display:block; transform-origin: 50% 50%; }
+  svg{ width:100%; height:100%; display:block; transform-origin: 50% 50%; touch-action: none; }
   .qualified circle{ animation: pulse 2.4s ease-in-out infinite; }
   @keyframes pulse{
     0%,100%{ filter: drop-shadow(0 0 0 rgba(212,165,55,0)); }
@@ -1344,6 +1348,14 @@ setInterval(sendHeartbeat, 20000);
   const svg = document.getElementById('wheel');
   if(!wrap || !svg) return;
 
+  // iOS Safari deliberately ignores the viewport meta tag's user-scalable=no
+  // for accessibility reasons, so native pinch-zoom can still fire on the
+  // whole page underneath our custom gesture handling — this is the
+  // documented workaround: intercept Safari's own proprietary gesture events.
+  document.addEventListener('gesturestart', (e) => e.preventDefault());
+  document.addEventListener('gesturechange', (e) => e.preventDefault());
+  document.addEventListener('gestureend', (e) => e.preventDefault());
+
   const BASE_VB = { x:-30, y:-30, w:860, h:860 };
   let vb = { ...BASE_VB };
   let rotation = 0;
@@ -1466,23 +1478,8 @@ setInterval(sendHeartbeat, 20000);
   let touchStartPoint = null;
   let committed = false;
 
-  let lockedScrollY = 0;
   function lockBodyScroll(lock){
-    if(lock){
-      lockedScrollY = window.scrollY;
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${lockedScrollY}px`;
-      document.body.style.left = '0';
-      document.body.style.right = '0';
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.left = '';
-      document.body.style.right = '';
-      document.body.style.overflow = '';
-      window.scrollTo(0, lockedScrollY);
-    }
+    document.body.style.overflow = lock ? 'hidden' : '';
   }
 
   wrap.addEventListener('touchstart', (e) => {
