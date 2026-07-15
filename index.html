@@ -91,7 +91,9 @@
     aspect-ratio: 1 / 1;
     box-sizing: border-box;
     position: relative;
-    border-radius: 32px;
+    border-radius: 50%;
+    clip-path: circle(50%);
+    -webkit-clip-path: circle(50%);
   }
   svg{ width:100%; height:100%; display:block; transform-origin: 50% 50%; touch-action: none; }
   .qualified circle{ animation: pulse 2.4s ease-in-out infinite; }
@@ -489,14 +491,14 @@ const baseR32 = [
   {id:'M2', home:{n:'Netherlands', c:'NED', f:'🇳🇱'}, away:{n:'Morocco', c:'MAR', f:'🇲🇦'}, score:[1,1], status:'final', pk:true, winnerSide:'away'},
   {id:'M3', home:{n:'Germany', c:'GER', f:'🇩🇪'}, away:{n:'Paraguay', c:'PAR', f:'🇵🇾'}, score:[1,1], status:'final', pk:true, winnerSide:'away'},
   {id:'M4', home:{n:'France', c:'FRA', f:'🇫🇷'}, away:{n:'Sweden', c:'SWE', f:'🇸🇪'}, score:[3,0], status:'final'},
-  {id:'M5', home:{n:'Brazil', c:'BRA', f:'🇧🇷'}, away:{n:'Japan', c:'JPN', f:'🇯🇵'}, score:[2,1], status:'final'},
-  {id:'M6', home:{n:'Ivory Coast', c:'CIV', f:'🇨🇮'}, away:{n:'Norway', c:'NOR', f:'🇳🇴'}, score:[1,2], status:'final'},
-  {id:'M7', home:{n:'Mexico', c:'MEX', f:'🇲🇽'}, away:{n:'Ecuador', c:'ECU', f:'🇪🇨'}, score:[2,0], status:'final'},
-  {id:'M8', home:{n:'England', c:'ENG', f:'🏴󠁧󠁢󠁥󠁮󠁧󠁿'}, away:{n:'Congo DR', c:'COD', f:'🇨🇩'}, score:[2,1], status:'final'},
-  {id:'M9', home:{n:'Spain', c:'ESP', f:'🇪🇸'}, away:{n:'Austria', c:'AUT', f:'🇦🇹'}, score:[3,0], status:'final'},
-  {id:'M10', home:{n:'Portugal', c:'POR', f:'🇵🇹'}, away:{n:'Croatia', c:'CRO', f:'🇭🇷'}, score:[2,1], status:'final'},
-  {id:'M11', home:{n:'Belgium', c:'BEL', f:'🇧🇪'}, away:{n:'Senegal', c:'SEN', f:'🇸🇳'}, score:[3,2], status:'final'},
-  {id:'M12', home:{n:'USA', c:'USA', f:'🇺🇸'}, away:{n:'Bosnia & Herz.', c:'BIH', f:'🇧🇦'}, score:[2,0], status:'final'},
+  {id:'M5', home:{n:'Spain', c:'ESP', f:'🇪🇸'}, away:{n:'Austria', c:'AUT', f:'🇦🇹'}, score:[3,0], status:'final'},
+  {id:'M6', home:{n:'Portugal', c:'POR', f:'🇵🇹'}, away:{n:'Croatia', c:'CRO', f:'🇭🇷'}, score:[2,1], status:'final'},
+  {id:'M7', home:{n:'Belgium', c:'BEL', f:'🇧🇪'}, away:{n:'Senegal', c:'SEN', f:'🇸🇳'}, score:[3,2], status:'final'},
+  {id:'M8', home:{n:'USA', c:'USA', f:'🇺🇸'}, away:{n:'Bosnia & Herz.', c:'BIH', f:'🇧🇦'}, score:[2,0], status:'final'},
+  {id:'M9', home:{n:'Brazil', c:'BRA', f:'🇧🇷'}, away:{n:'Japan', c:'JPN', f:'🇯🇵'}, score:[2,1], status:'final'},
+  {id:'M10', home:{n:'Ivory Coast', c:'CIV', f:'🇨🇮'}, away:{n:'Norway', c:'NOR', f:'🇳🇴'}, score:[1,2], status:'final'},
+  {id:'M11', home:{n:'Mexico', c:'MEX', f:'🇲🇽'}, away:{n:'Ecuador', c:'ECU', f:'🇪🇨'}, score:[2,0], status:'final'},
+  {id:'M12', home:{n:'England', c:'ENG', f:'🏴󠁧󠁢󠁥󠁮󠁧󠁿'}, away:{n:'Congo DR', c:'COD', f:'🇨🇩'}, score:[2,1], status:'final'},
   {id:'M13', home:{n:'Australia', c:'AUS', f:'🇦🇺'}, away:{n:'Egypt', c:'EGY', f:'🇪🇬'}, score:[1,1], status:'final', pk:true, winnerSide:'away'},
   {id:'M14', home:{n:'Argentina', c:'ARG', f:'🇦🇷'}, away:{n:'Cape Verde', c:'CPV', f:'🇨🇻'}, score:[3,2], status:'final'},
   {id:'M15', home:{n:'Switzerland', c:'SUI', f:'🇨🇭'}, away:{n:'Algeria', c:'DZA', f:'🇩🇿'}, score:[2,0], status:'final'},
